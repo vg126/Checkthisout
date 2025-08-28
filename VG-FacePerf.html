@@ -513,7 +513,9 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { createModelSelector } from "./components/modelSelector.js";
+
         // Global state - Updated for dual bot system
         let uploadedFiles = []; // Changed to array for multi-image support
         let generatedImages = [];
@@ -657,8 +659,6 @@
             // Dual Bot Models
             generationModel1: document.getElementById('generationModel1'),
             generationModel2: document.getElementById('generationModel2'),
-            multimodalModel1: document.getElementById('multimodalModel1'),
-            multimodalModel2: document.getElementById('multimodalModel2'),
             targetScore: document.getElementById('targetScore'),
             
             // Custom Dropdown Elements
@@ -741,191 +741,6 @@
         window.Poe.registerHandler("ask-handler-1", handleAskResponse1);
         window.Poe.registerHandler("ask-handler-2", handleAskResponse2);
         window.Poe.registerHandler("remove-bg-handler", handleRemoveBgResponse);
-
-        // Custom Dropdown State
-        let multimodalDropdownState = {
-            dropdown1: { isOpen: false, value: '@Claude-Sonnet-4' },
-            dropdown2: { isOpen: false, value: '@GPT-4.1-mini' }
-        };
-
-        // Massive Multimodal Model Structure
-        const multimodalModels = {
-            "GPT": {
-                "GPT-5 Series": [
-                    "@GPT-5-Chat",
-                    "@GPT-5",
-                    "@GPT-5-mini",
-                    "@GPT-5-nano"
-                ],
-                "GPT-4 Series": [
-                    "@GPT-4.1",
-                    "@GPT-4o-Search"
-                ],
-                "o-Series (Reasoning)": [
-                    "@o1",
-                    "@o3",
-                    "@o3-pro"
-                ]
-            },
-            "GPT - Open Weight": {
-                "120B Parameter Models": [
-                    "@GPT-OSS-120B-T",
-                    "@GPT-OSS-120B",
-                    "@GPT-OSS-120B-CS",
-                    "@OpenAI-GPT-OSS-120B"
-                ],
-                "20B Parameter Models": [
-                    "@GPT-OSS-20B-T",
-                    "@GPT-OSS-20B",
-                    "@OpenAI-GPT-OSS-20B"
-                ]
-            },
-            "Google": {
-                "Gemini 2.5 Series": [
-                    "@Gemini-2.5-Pro",
-                    "@Gemini-2.5-Flash",
-                    "@Gemini-2.5-Flash-Lite"
-                ],
-                "Gemma Series": [
-                    "@Gemma-3-27B",
-                    "@Gemma-2-27b-T"
-                ]
-            },
-            "Claude": {
-                "Opus Series": [
-                    "@Claude-Opus-4.1",
-                    "@Claude-Opus-4",
-                    "@Claude-Opus-4-Reasoning",
-                    "@Claude-Opus-4-Search"
-                ],
-                "Sonnet Series": [
-                    "@Claude-Sonnet-4",
-                    "@Claude-Sonnet-4-Reasoning",
-                    "@Claude-Sonnet-4-Search"
-                ],
-                "Haiku Series": [
-                    "@Claude-Haiku-3.5"
-                ]
-            },
-            "Grok": [
-                "@Grok-4",
-                "@Grok-3",
-                "@Grok-3-Mini",
-                "@Grok-Code-Fast-1"
-            ],
-            "Llama 4": [
-                "@Llama-4-Scout-B10",
-                "@Llama-4-Maverick",
-                "@Llama-4-Scout-T",
-                "@Llama-4-Scout-CS",
-                "@Llama-4-Scout",
-                "@Llama-4-Maverick-T",
-                "@Llama-4-Maverick-B10"
-            ],
-            "Llama 3.X": {
-                "The Behemoths (405B)": [
-                    "@Llama-3.1-405B",
-                    "@Llama-3.1-405B-T",
-                    "@Llama-3.1-405B-FW",
-                    "@Llama-3.1-405B-FP16"
-                ],
-                "The Curated 70B Fleet": [
-                    "@Llama-3-70b-Groq",
-                    "@Llama-3.3-70B",
-                    "@Llama-3.1-Nemotron",
-                    "@Llama-3.3-70B-DI",
-                    "@Llama-3.3-70B-CS",
-                    "@Llama-3.3-70B-Vers"
-                ]
-            },
-            "Qwen (235B+)": [
-                "@Qwen3-Coder",
-                "@Qwen-3-235B-2507-T",
-                "@Qwen3-235B-2507-FW",
-                "@Qwen3-235B-2507-CS",
-                "@Qwen3-Coder-480B-T",
-                "@Qwen3-Coder-480B-N",
-                "@Qwen3-480B-Coder-CS",
-                "@Qwen3-235B-A22B-DI",
-                "@Qwen3-235B-A22B",
-                "@Qwen3-235B-A22B-N",
-                "@Qwen3-235B-Think-CS"
-            ],
-            "DeepSeek": {
-                "R1 Series (Reasoning)": [
-                    "@DeepSeek-R1",
-                    "@DeepSeek-R1-FW",
-                    "@DeepSeek-R1-DI",
-                    "@DeepSeek-R1-N",
-                    "@DeepSeek-R1-Distill",
-                    "@DeepSeek-R1-Turbo-DI"
-                ],
-                "V3 Series (Foundation)": [
-                    "@DeepSeek-V3.1",
-                    "@DeepSeek-V3.1-N",
-                    "@Deepseek-V3-FW",
-                    "@DeepSeek-V3",
-                    "@DeepSeek-V3-DI",
-                    "@DeepSeek-V3-Turbo-DI"
-                ],
-                "Specialized & Hybrids": [
-                    "@DeepSeek-Prover-V2",
-                    "@DeepClaude"
-                ]
-            },
-            "Mistral (Revised)": {
-                "Large Series": [
-                    "@Mistral-Large-2"
-                ],
-                "Medium Series": [
-                    "@Mistral-Medium-3",
-                    "@Mistral-Medium",
-                    "@Magistral-Medium-2506-Thinking"
-                ],
-                "Small Series (Vision-Enabled)": [
-                    "@Mistral-Small-3.2",
-                    "@Mistral-Small-3.1",
-                    "@Mistral-Small-3"
-                ],
-                "Specialized & MoE Models": [
-                    "@Mistral-NeMo",
-                    "@Mixtral8x22b-Inst-FW"
-                ]
-            },
-            "Perplexity": [
-                "@Perplexity-R1-1776",
-                "@Perplexity-Sonar",
-                "@Perplexity-Sonar-Pro",
-                "@Perplexity-Sonar-Rsn",
-                "@Perplexity-Sonar-Rsn-Pro"
-            ],
-            "Wildcards (A-K)": [
-                "@Aya-Expanse-32B",
-                "@Aya-Vision",
-                "@Command-R",
-                "@Command-R-Plus",
-                "@GLM-4.5",
-                "@GLM-4.5-Air",
-                "@GLM-4.5-Air-T",
-                "@GLM-4.5-FW",
-                "@Inception-Mercury",
-                "@Kimi-K2",
-                "@Kimi-K2-Instruct",
-                "@Kimi-K2-T"
-            ],
-            "Wildcards (L-Z)": [
-                "@Linkup-Deep-Search",
-                "@Linkup-Standard",
-                "@MiniMax-M1",
-                "@Phi-4-DI",
-                "@QwQ-32B-B10",
-                "@QwQ-32B-Preview-T",
-                "@QwQ-32B-T",
-                "@Reka-Core",
-                "@Reka-Flash",
-                "@Solar-Pro-2"
-            ]
-        };
 
         // Multi-image file handling
         function handleFiles(files) {
@@ -1088,6 +903,11 @@
 
         // Global function for feeding images to reference (called from HTML)
         window.feedImageToReference = feedImageToReference;
+
+        const modelSelector1 = createModelSelector(1, dom, showAlert);
+        const modelSelector2 = createModelSelector(2, dom, showAlert);
+        modelSelector1.onOpen(() => modelSelector2.close());
+        modelSelector2.onOpen(() => modelSelector1.close());
         
         // Copy and transfer functions (called from HTML)
         function copyTextToClipboard(elementId) {
@@ -1333,92 +1153,6 @@
             }, 100);
         }
 
-        // Custom Dropdown Functions
-        function createDropdownContent(dropdownNumber) {
-            let content = '';
-            
-            Object.entries(multimodalModels).forEach(([category, models]) => {
-                if (Array.isArray(models)) {
-                    // Category without subcategories
-                    content += `<div class="dropdown-category">
-                        <div class="px-3 py-2 text-xs font-semibold text-gray-400 bg-gray-600 border-b border-gray-500">📁 ${category}</div>`;
-                    models.forEach(model => {
-                        content += `<div class="dropdown-item px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer border-b border-gray-600" onclick="selectModel('${model}', ${dropdownNumber})">${model}</div>`;
-                    });
-                    content += `</div>`;
-                } else {
-                    // Category with subcategories
-                    content += `<div class="dropdown-category">
-                        <div class="px-3 py-2 text-xs font-semibold text-gray-400 bg-gray-600 border-b border-gray-500">📁 ${category}</div>`;
-                    Object.entries(models).forEach(([subcategory, submodels]) => {
-                        content += `<div class="dropdown-subcategory">
-                            <div class="px-5 py-1 text-xs font-medium text-gray-300 bg-gray-650 border-b border-gray-600">📂 ${subcategory}</div>`;
-                        submodels.forEach(model => {
-                            content += `<div class="dropdown-item px-6 py-2 text-sm hover:bg-gray-600 cursor-pointer border-b border-gray-600" onclick="selectModel('${model}', ${dropdownNumber})">${model}</div>`;
-                        });
-                        content += `</div>`;
-                    });
-                    content += `</div>`;
-                }
-            });
-            
-            return content;
-        }
-        
-        function toggleDropdown(dropdownNumber) {
-            const menu = dropdownNumber === 1 ? dom.multimodalMenu1 : dom.multimodalMenu2;
-            const arrow = dropdownNumber === 1 ? dom.multimodalArrow1 : dom.multimodalArrow2;
-            const state = dropdownNumber === 1 ? 'dropdown1' : 'dropdown2';
-            
-            if (multimodalDropdownState[state].isOpen) {
-                // Close dropdown
-                menu.classList.add('hidden');
-                arrow.classList.remove('rotate-180');
-                multimodalDropdownState[state].isOpen = false;
-            } else {
-                // Close the other dropdown first
-                const otherState = dropdownNumber === 1 ? 'dropdown2' : 'dropdown1';
-                const otherMenu = dropdownNumber === 1 ? dom.multimodalMenu2 : dom.multimodalMenu1;
-                const otherArrow = dropdownNumber === 1 ? dom.multimodalArrow2 : dom.multimodalArrow1;
-                
-                otherMenu.classList.add('hidden');
-                otherArrow.classList.remove('rotate-180');
-                multimodalDropdownState[otherState].isOpen = false;
-                
-                // Open this dropdown
-                menu.innerHTML = createDropdownContent(dropdownNumber);
-                menu.classList.remove('hidden');
-                arrow.classList.add('rotate-180');
-                multimodalDropdownState[state].isOpen = true;
-            }
-        }
-        
-        function selectModel(modelValue, dropdownNumber) {
-            const selected = dropdownNumber === 1 ? dom.multimodalSelected1 : dom.multimodalSelected2;
-            const menu = dropdownNumber === 1 ? dom.multimodalMenu1 : dom.multimodalMenu2;
-            const arrow = dropdownNumber === 1 ? dom.multimodalArrow1 : dom.multimodalArrow2;
-            const state = dropdownNumber === 1 ? 'dropdown1' : 'dropdown2';
-            
-            // Update displayed value
-            selected.textContent = modelValue;
-            multimodalDropdownState[state].value = modelValue;
-            
-            // Close dropdown
-            menu.classList.add('hidden');
-            arrow.classList.remove('rotate-180');
-            multimodalDropdownState[state].isOpen = false;
-            
-            showAlert(`Selected ${modelValue} for Bot ${dropdownNumber}`);
-        }
-        
-        function getMultimodalModel(botNumber) {
-            const state = botNumber === 1 ? 'dropdown1' : 'dropdown2';
-            return multimodalDropdownState[state].value;
-        }
-        
-        // Make selectModel globally available
-        window.selectModel = selectModel;
-
         // Dual Bot Ask Functions
         function askBot1() {
             const askText = dom.askInput1.value.trim();
@@ -1432,7 +1166,7 @@
             bot1State.isAIThinking = true;
             dom.askBtn1.disabled = true;
             
-            const model = getMultimodalModel(1);
+            const model = modelSelector1.getSelectedModel();
             const prompt = dom.userPrompt1.value.trim();
             const instructions = dom.askInput1.value.trim();
             
@@ -1482,7 +1216,7 @@ Please respond to the user's request with helpful, detailed guidance. When sugge
             bot2State.isAIThinking = true;
             dom.askBtn2.disabled = true;
             
-            const model = getMultimodalModel(2);
+            const model = modelSelector2.getSelectedModel();
             const prompt = dom.userPrompt2.value.trim();
             const instructions = dom.askInput2.value.trim();
             
@@ -1624,15 +1358,14 @@ Please respond to the user's request with helpful, detailed guidance. When sugge
                     userPrompt2: dom.userPrompt2.value,
                     generationModel1: dom.generationModel1.value,
                     generationModel2: dom.generationModel2.value,
-                    multimodalModel1: getMultimodalModel(1),
-                    multimodalModel2: getMultimodalModel(2),
+                    multimodalModel1: modelSelector1.getSelectedModel(),
+                    multimodalModel2: modelSelector2.getSelectedModel(),
                     targetScore: dom.targetScore.value,
                     askInput1: dom.askInput1.value,
                     askInput2: dom.askInput2.value,
                     generatedImages: generatedImages,
                     bot1State: bot1State,
-                    bot2State: bot2State,
-                    multimodalDropdownState: multimodalDropdownState
+                    bot2State: bot2State
                 };
 
                 const stateJson = JSON.stringify(state, null, 2);
@@ -1783,19 +1516,11 @@ Please respond to the user's request with helpful, detailed guidance. When sugge
                 dom.targetScore.value = state.targetScore || '85';
                 dom.askInput1.value = state.askInput1 || '';
                 dom.askInput2.value = state.askInput2 || '';
-
                 // Restore custom dropdown states
-                if (state.multimodalDropdownState) {
-                    multimodalDropdownState = state.multimodalDropdownState;
-                } else {
-                    // Legacy support: restore from multimodalModel1/2 values if available
-                    multimodalDropdownState.dropdown1.value = state.multimodalModel1 || '@Claude-Sonnet-4';
-                    multimodalDropdownState.dropdown2.value = state.multimodalModel2 || '@GPT-4.1-mini';
-                }
-                
-                // Update dropdown display values
-                dom.multimodalSelected1.textContent = multimodalDropdownState.dropdown1.value;
-                dom.multimodalSelected2.textContent = multimodalDropdownState.dropdown2.value;
+                const mm1 = state.multimodalDropdownState ? state.multimodalDropdownState.dropdown1.value : (state.multimodalModel1 || '@Claude-Sonnet-4');
+                const mm2 = state.multimodalDropdownState ? state.multimodalDropdownState.dropdown2.value : (state.multimodalModel2 || '@GPT-4.1-mini');
+                modelSelector1.setSelectedModel(mm1);
+                modelSelector2.setSelectedModel(mm2);
 
                 // Restore generated images
                 generatedImages = state.generatedImages || [];
@@ -2232,7 +1957,7 @@ Please respond to the user's request with helpful, detailed guidance. When sugge
             dom.iterateBtn1.disabled = true;
             
             const latestImage = bot1Images[bot1Images.length - 1];
-            const model = getMultimodalModel(1);
+            const model = modelSelector1.getSelectedModel();
             const targetScore = dom.targetScore.value;
             
             let analysisPrompt = `You are an expert image analysis AI specializing in character generation and prompt optimization for reference image systems.
@@ -2315,7 +2040,7 @@ IMPROVED_PROMPT: [A refined version of the original prompt that addresses the id
             dom.iterateBtn2.disabled = true;
             
             const latestImage = bot2Images[bot2Images.length - 1];
-            const model = getMultimodalModel(2);
+            const model = modelSelector2.getSelectedModel();
             const targetScore = dom.targetScore.value;
             const instructions = dom.askInput2.value.trim();
             
@@ -2609,15 +2334,14 @@ IMPROVED_PROMPT: [A refined version of the original prompt that addresses the id
                     userPrompt2: dom.userPrompt2.value,
                     generationModel1: dom.generationModel1.value,
                     generationModel2: dom.generationModel2.value,
-                    multimodalModel1: getMultimodalModel(1),
-                    multimodalModel2: getMultimodalModel(2),
+                    multimodalModel1: modelSelector1.getSelectedModel(),
+                    multimodalModel2: modelSelector2.getSelectedModel(),
                     targetScore: dom.targetScore.value,
                     askInput1: dom.askInput1.value,
                     askInput2: dom.askInput2.value,
                     generatedImages: generatedImages,
                     bot1State: bot1State,
-                    bot2State: bot2State,
-                    multimodalDropdownState: multimodalDropdownState
+                    bot2State: bot2State
                 };
 
                 const stateJson = JSON.stringify(state, null, 2);
@@ -2800,31 +2524,6 @@ IMPROVED_PROMPT: [A refined version of the original prompt that addresses the id
         // Functionality buttons
         dom.downloadAllBtn.addEventListener('click', downloadAllImages);
         
-        // Custom dropdown event listeners
-        dom.multimodalDropdown1.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleDropdown(1);
-        });
-        
-        dom.multimodalDropdown2.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleDropdown(2);
-        });
-        
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!dom.multimodalMenu1.contains(e.target) && !dom.multimodalDropdown1.contains(e.target)) {
-                dom.multimodalMenu1.classList.add('hidden');
-                dom.multimodalArrow1.classList.remove('rotate-180');
-                multimodalDropdownState.dropdown1.isOpen = false;
-            }
-            if (!dom.multimodalMenu2.contains(e.target) && !dom.multimodalDropdown2.contains(e.target)) {
-                dom.multimodalMenu2.classList.add('hidden');
-                dom.multimodalArrow2.classList.remove('rotate-180');
-                multimodalDropdownState.dropdown2.isOpen = false;
-            }
-        });
-
         // Dual bot event listeners with logging
         dom.generateBtn1.addEventListener('click', () => {
             generateBot1();
