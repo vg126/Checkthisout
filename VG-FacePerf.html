@@ -1,0 +1,2914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Perfectionist - Iterative AI Refinement</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        secondary: '#059669',
+                        accent: '#10B981',
+                    }
+                }
+            },
+            darkMode: 'class'
+        }
+    </script>
+    <style>
+        /* Simple styling */
+        .clickable-image {
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .clickable-image:hover {
+            opacity: 0.8;
+        }
+        
+        /* Modal styling */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal img {
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+        }
+        
+        /* Loading dots animation */
+        .loading-dots::after {
+            content: '';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-primary">Face Perfectionist</h1>
+            <p class="text-gray-300">Iterative AI-driven synthesis of text prompts + reference guidance</p>
+        </div>
+
+        <!-- Main 4-Box Grid Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Box 1: Reference Image -->
+            <div class="bg-gray-800 rounded-xl p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">Reference Image</h2>
+                    <div class="flex gap-2">
+                        <button id="copyStateBtn" class="bg-gray-700 hover:bg-gray-600 text-white py-1 px-2 rounded text-sm" title="Copy current state to clipboard">
+                            💾
+                        </button>
+                        <button id="loadStateBtn" class="bg-gray-700 hover:bg-gray-600 text-white py-1 px-2 rounded text-sm" title="Load state from clipboard">
+                            📁
+                        </button>
+                    </div>
+                </div>
+                <div id="uploadArea" class="border-2 border-dashed border-gray-600 rounded-xl p-6 text-center hover:border-primary transition-colors cursor-pointer">
+                    <div id="uploadPrompt">
+                        <svg class="w-12 h-12 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <p class="text-gray-300">Drop reference images or click to upload</p>
+                        <p class="text-sm text-gray-500 mt-2">Multiple images supported for Gemini 2.5 Flash</p>
+                    </div>
+                    <div id="imagesContainer" class="hidden">
+                        <div id="imageGrid" class="grid grid-cols-2 gap-3 mb-3"></div>
+                        <div class="flex justify-center gap-2">
+                            <button id="addMoreBtn" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Add More</button>
+                            <button id="removeBgBtn" class="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm disabled:opacity-50" title="Remove BG (single image only)">Remove BG</button>
+                            <button id="clearAllBtn" class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm">Clear All</button>
+                        </div>
+                    </div>
+                </div>
+                <input type="file" id="fileInput" class="hidden" accept="image/*" multiple>
+                
+                <!-- Additional State Management Buttons -->
+                <div class="flex justify-end gap-2 mt-4">
+                    <button id="downloadStateBtn" class="bg-gray-700 hover:bg-gray-600 text-white py-1 px-2 rounded text-sm" title="Download state as JSON file">
+                        ⬇️
+                    </button>
+                    <button id="uploadStateBtn" class="bg-gray-700 hover:bg-gray-600 text-white py-1 px-2 rounded text-sm" title="Upload state from JSON file">
+                        ⬆️
+                    </button>
+                </div>
+            </div>
+
+            <!-- Box 2: Generated Images -->
+            <div class="bg-gray-800 rounded-xl p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-green-400">🖼️ Generated Images</h2>
+                    <button id="downloadAllBtn" class="bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded text-sm transition-all" title="Download All Images">
+                        ⬇️
+                    </button>
+                </div>
+                <div id="generatedImages" class="grid grid-cols-1 gap-4 min-h-48">
+                    <div class="text-gray-500 text-center py-8">
+                        <div class="text-4xl mb-2">🎨</div>
+                        <p class="text-sm">Generated images will appear here...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Configuration Section -->
+        <div class="bg-gray-800 rounded-xl p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-6 text-purple-400">🤖 Dual Bot Configuration</h2>
+            
+            <!-- Target Score -->
+            <div class="mb-6">
+                <label class="block text-xs font-medium mb-1">Target Score</label>
+                <input type="number" id="targetScore" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm" value="85" min="60" max="100">
+            </div>
+
+            <!-- Separated Bot Configurations -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Bot 1 Complete Configuration -->
+                <div class="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4">
+                    <h3 class="text-lg font-medium text-blue-400 mb-4 text-center">🤖 Bot 1</h3>
+                    
+                    <!-- Bot 1 Model Selectors -->
+                    <div class="space-y-3 mb-4">
+                        <div>
+                            <label class="block text-xs font-medium mb-1">Image Generation 1</label>
+                            <select id="generationModel1" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm">
+                                <option value="@Gemini-2.5-Flash-Image" selected>Gemini 2.5 Flash Image</option>
+                                <option value="@Flux-Kontext-Max">Flux Kontext Max</option>
+                                <option value="@Flux-Kontext-Pro">Flux Kontext Pro</option>
+                                <option value="@FLUX-schnell">FLUX Schnell</option>
+                                <option value="@Qwen-Edit">Qwen Edit</option>
+                                <option value="@Qwen-Image">Qwen Image</option>
+                                <option value="@Restyler">Restyler</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1">Multimodal AI 1</label>
+                            <div class="relative">
+                                <button id="multimodalDropdown1" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm text-left flex justify-between items-center hover:bg-gray-600">
+                                    <span id="multimodalSelected1">@Claude-Sonnet-4</span>
+                                    <svg class="w-4 h-4 transform transition-transform" id="multimodalArrow1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div id="multimodalMenu1" class="hidden absolute z-50 w-full max-h-80 overflow-y-auto bg-gray-700 border border-gray-600 rounded-b shadow-lg"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bot 1 Controls -->
+                    <div class="bg-blue-900/30 border border-blue-500/40 rounded-lg p-3">
+                        <h4 class="text-center text-blue-300 font-medium mb-3 text-sm">Controls</h4>
+                        <div class="flex justify-center gap-2">
+                            <button id="askBtn1" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm" title="Ask Bot 1">
+                                💬
+                            </button>
+                            <button id="feedBtn1" class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm" title="Feed Bot 1 Response">
+                                ⬆️
+                            </button>
+                            <button id="iterateBtn1" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm" title="Iterate Bot 1">
+                                🔄
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Bot 2 Complete Configuration -->
+                <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+                    <h3 class="text-lg font-medium text-green-400 mb-4 text-center">🤖 Bot 2</h3>
+                    
+                    <!-- Bot 2 Model Selectors -->
+                    <div class="space-y-3 mb-4">
+                        <div>
+                            <label class="block text-xs font-medium mb-1">Image Generation 2</label>
+                            <select id="generationModel2" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm">
+                                <option value="@FLUX-schnell" selected>FLUX Schnell</option>
+                                <option value="@Gemini-2.5-Flash-Image">Gemini 2.5 Flash Image</option>
+                                <option value="@Flux-Kontext-Max">Flux Kontext Max</option>
+                                <option value="@Flux-Kontext-Pro">Flux Kontext Pro</option>
+                                <option value="@Qwen-Edit">Qwen Edit</option>
+                                <option value="@Qwen-Image">Qwen Image</option>
+                                <option value="@Restyler">Restyler</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1">Multimodal AI 2</label>
+                            <div class="relative">
+                                <button id="multimodalDropdown2" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white text-sm text-left flex justify-between items-center hover:bg-gray-600">
+                                    <span id="multimodalSelected2">@GPT-4.1-mini</span>
+                                    <svg class="w-4 h-4 transform transition-transform" id="multimodalArrow2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div id="multimodalMenu2" class="hidden absolute z-50 w-full max-h-80 overflow-y-auto bg-gray-700 border border-gray-600 rounded-b shadow-lg"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bot 2 Controls -->
+                    <div class="bg-green-900/30 border border-green-500/40 rounded-lg p-3">
+                        <h4 class="text-center text-green-300 font-medium mb-3 text-sm">Controls</h4>
+                        <div class="flex justify-center gap-2">
+                            <button id="askBtn2" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm" title="Ask Bot 2">
+                                💬
+                            </button>
+                            <button id="feedBtn2" class="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm" title="Feed Bot 2 Response">
+                                ⬆️
+                            </button>
+                            <button id="iterateBtn2" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm" title="Iterate Bot 2">
+                                🔄
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status displays -->
+            <div id="generateStatus" class="mt-4 text-center text-gray-500 hidden">
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-green-400 mx-auto mb-2"></div>
+                <p class="loading-dots">Generating images</p>
+            </div>
+            <div id="iterateStatus" class="mt-4 text-center text-gray-500 hidden">
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400 mx-auto mb-2"></div>
+                <p class="loading-dots">Analyzing</p>
+            </div>
+        </div>
+
+        <!-- Generation Buttons Section -->
+        <div class="bg-gray-800 rounded-xl p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-6 text-green-400">🎨 Image Generation</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Bot 1 Generate -->
+                <div class="space-y-3">
+                    <button id="generateBtn1" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                        🎨 Generate Bot 1
+                    </button>
+                    <div id="generateStatus1" class="text-center text-gray-500 hidden">
+                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-green-400 mx-auto mb-1"></div>
+                        <p class="text-xs loading-dots">Generating image</p>
+                    </div>
+                </div>
+                
+                <!-- Bot 2 Generate -->
+                <div class="space-y-3">
+                    <button id="generateBtn2" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                        🎨 Generate Bot 2
+                    </button>
+                    <div id="generateStatus2" class="text-center text-gray-500 hidden">
+                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-green-400 mx-auto mb-1"></div>
+                        <p class="text-xs loading-dots">Generating image</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dual Main Prompt Section -->
+        <div class="space-y-6 mb-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Main Prompt 1 -->
+                <div class="bg-gray-800 rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-blue-400">✏️ Main Prompt 1</h2>
+                        <div class="flex gap-2">
+                            <button onclick="copyTextToClipboard('userPrompt1')" class="bg-gray-600 hover:bg-gray-500 text-white py-1 px-2 rounded text-xs" title="Copy">
+                                📋
+                            </button>
+                            <button onclick="transferText('userPrompt1', 'userPrompt2')" class="bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs" title="Send to Prompt 2">
+                                →
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="userPrompt1" class="w-full p-4 bg-gray-700 border border-gray-600 rounded-lg text-white text-base resize-none" rows="4" placeholder="Describe the person you want to generate (face, build, style, etc.)..."></textarea>
+                    <div id="promptStatus1" class="mt-2 text-center text-gray-500 hidden">
+                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400 mx-auto mb-1"></div>
+                        <p class="text-xs loading-dots">Processing prompt</p>
+                    </div>
+                    <div class="mt-2 text-sm text-gray-400">
+                        <p>💡 Focus on facial features, expression, build, clothing, and overall style</p>
+                    </div>
+                </div>
+
+                <!-- Main Prompt 2 -->
+                <div class="bg-gray-800 rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-green-400">✏️ Main Prompt 2</h2>
+                        <div class="flex gap-2">
+                            <button onclick="copyTextToClipboard('userPrompt2')" class="bg-gray-600 hover:bg-gray-500 text-white py-1 px-2 rounded text-xs" title="Copy">
+                                📋
+                            </button>
+                            <button onclick="transferText('userPrompt2', 'userPrompt1')" class="bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded text-xs" title="Send to Prompt 1">
+                                ←
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="userPrompt2" class="w-full p-4 bg-gray-700 border border-gray-600 rounded-lg text-white text-base resize-none" rows="4" placeholder="Describe the person you want to generate (face, build, style, etc.)..."></textarea>
+                    <div id="promptStatus2" class="mt-2 text-center text-gray-500 hidden">
+                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-green-400 mx-auto mb-1"></div>
+                        <p class="text-xs loading-dots">Processing prompt</p>
+                    </div>
+                    <div class="mt-2 text-sm text-gray-400">
+                        <p>💡 Focus on facial features, expression, build, clothing, and overall style</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dual Free-form Communication -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Free-form Communication 1 -->
+                <div class="bg-gray-800 rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-blue-400">💬 Free-form Communication 1</h2>
+                        <div class="flex gap-2">
+                            <button onclick="copyTextToClipboard('askInput1')" class="bg-gray-600 hover:bg-gray-500 text-white py-1 px-2 rounded text-xs" title="Copy">
+                                📋
+                            </button>
+                            <button onclick="transferText('askInput1', 'askInput2')" class="bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs" title="Send to Communication 2">
+                                →
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="askInput1" class="w-full p-4 bg-gray-700 border border-gray-600 rounded-lg text-white text-base resize-none" rows="3" placeholder="Ask Bot 1 about prompt enhancement, character details, style changes, etc..."></textarea>
+                    <div id="askStatus1" class="mt-2 text-center text-gray-500 hidden">
+                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400 mx-auto mb-1"></div>
+                        <p class="text-xs loading-dots">Thinking</p>
+                    </div>
+                    <div class="mt-2 text-sm text-gray-400">
+                        <p>💡 Use "Ask" button to communicate with Bot 1</p>
+                    </div>
+                </div>
+
+                <!-- Free-form Communication 2 -->
+                <div class="bg-gray-800 rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-green-400">💬 Free-form Communication 2</h2>
+                        <div class="flex gap-2">
+                            <button onclick="copyTextToClipboard('askInput2')" class="bg-gray-600 hover:bg-gray-500 text-white py-1 px-2 rounded text-xs" title="Copy">
+                                📋
+                            </button>
+                            <button onclick="transferText('askInput2', 'askInput1')" class="bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded text-xs" title="Send to Communication 1">
+                                ←
+                            </button>
+                        </div>
+                    </div>
+                    <textarea id="askInput2" class="w-full p-4 bg-gray-700 border border-gray-600 rounded-lg text-white text-base resize-none" rows="3" placeholder="Ask Bot 2 about prompt enhancement, character details, style changes, etc..."></textarea>
+                    <div id="askStatus2" class="mt-2 text-center text-gray-500 hidden">
+                        <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400 mx-auto mb-1"></div>
+                        <p class="text-xs loading-dots">Thinking</p>
+                    </div>
+                    <div class="mt-2 text-sm text-gray-400">
+                        <p>💡 Use "Ask" button to communicate with Bot 2</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dual AI Response Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- AI Response 1 -->
+            <div class="bg-gray-800 rounded-xl p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-blue-400">🤖 AI Response 1</h2>
+                    <div class="flex gap-2">
+                        <button onclick="copyAIResponse(1)" class="bg-gray-600 hover:bg-gray-500 text-white py-1 px-2 rounded text-xs" title="Copy">
+                            📋
+                        </button>
+                        <button onclick="transferAIResponse(1, 2)" class="bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs" title="Send to Response 2">
+                            →
+                        </button>
+                    </div>
+                </div>
+                <div id="aiResponse1" class="min-h-48">
+                    <div id="aiResponseContainer1" class="text-gray-300 text-sm">Bot 1 responses will appear here...</div>
+                </div>
+                <div class="mt-3 flex justify-end">
+                    <button id="collapseBtn1" class="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm">
+                        ➖ Collapse
+                    </button>
+                </div>
+            </div>
+
+            <!-- AI Response 2 -->
+            <div class="bg-gray-800 rounded-xl p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-green-400">🤖 AI Response 2</h2>
+                    <div class="flex gap-2">
+                        <button onclick="copyAIResponse(2)" class="bg-gray-600 hover:bg-gray-500 text-white py-1 px-2 rounded text-xs" title="Copy">
+                            📋
+                        </button>
+                        <button onclick="transferAIResponse(2, 1)" class="bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded text-xs" title="Send to Response 1">
+                            ←
+                        </button>
+                    </div>
+                </div>
+                <div id="aiResponse2" class="min-h-48">
+                    <div id="aiResponseContainer2" class="text-gray-300 text-sm">Bot 2 responses will appear here...</div>
+                </div>
+                <div class="mt-3 flex justify-end">
+                    <button id="collapseBtn2" class="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm">
+                        ➖ Collapse
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- Control Buttons Section -->
+        <div class="flex justify-between items-center mb-8">
+            <!-- Log button on the left -->
+            <button id="logToggleBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200" title="Show/Hide interaction log">
+                📋 Log <span id="logArrow">▼</span>
+            </button>
+            
+            <!-- Right side buttons -->
+            <div class="flex gap-3">
+                <button onclick="downloadAllResponses()" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-3 rounded-lg transition-all duration-200" title="Download all AI responses as markdown">
+                    📄
+                </button>
+                <button id="resetBtn" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200">
+                    🔄 Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Collapsible Log Section - appears directly below the buttons -->
+        <div id="logSection" class="hidden mb-8">
+            <div class="bg-gray-800 rounded-xl p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-yellow-400">📋 Interaction Log</h2>
+                    <button id="clearLogBtn" class="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded text-sm">
+                        Clear Log
+                    </button>
+                </div>
+                <div id="logContent" class="bg-gray-700 rounded-lg p-4 max-h-96 overflow-y-auto">
+                    <div class="text-gray-400 text-sm" id="emptyLogMessage">Log is empty. Interactions will appear here...</div>
+                </div>
+            </div>
+        </div>
+
+
+
+
+
+        <!-- Analysis Results Section -->
+        <div id="analysisSection" class="hidden mb-8">
+            <div class="bg-gray-800 rounded-xl p-6">
+                <h2 class="text-xl font-semibold mb-4">🔍 Analysis Results</h2>
+                <div id="analysisResults" class="space-y-4">
+                    <!-- Analysis results will appear here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Result -->
+        <div id="cinemaSection" class="hidden mb-8">
+            <div class="bg-gray-800 rounded-xl p-6">
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-bold text-yellow-400 mb-2">🎭 Current Result</h2>
+                    <div class="flex justify-center items-center gap-4">
+                        <div class="text-gray-300">Iteration: <span id="finalIteration" class="font-bold">-</span></div>
+                        <div class="text-gray-300">Score: <span id="finalScore" class="font-bold text-xl">-</span></div>
+                    </div>
+                </div>
+                <div id="finalImageContainer" class="text-center">
+                    <div id="finalImagePlaceholder" class="text-gray-500 py-16">
+                        <div class="text-6xl mb-4">🎬</div>
+                        <p>Your result will appear here...</p>
+                    </div>
+                    <img id="finalImage" class="hidden max-w-full max-h-96 rounded-lg shadow-lg clickable-image" alt="Current generated image">
+                </div>
+            </div>
+        </div>
+
+        <!-- Iteration History -->
+        <div id="historySection" class="hidden">
+            <div class="bg-gray-800 rounded-xl p-6">
+                <h2 class="text-xl font-semibold mb-6">📚 Iteration History</h2>
+                <div id="iterationHistory" class="space-y-4">
+                    <!-- History will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state - Updated for dual bot system
+        let uploadedFiles = []; // Changed to array for multi-image support
+        let generatedImages = [];
+        let bot1State = {
+            lastAIResponse: '',
+            isGenerating: false,
+            isAIThinking: false
+        };
+        let bot2State = {
+            lastAIResponse: '',
+            isGenerating: false,
+            isAIThinking: false
+        };
+        
+        // Simple, bulletproof logging system
+        let logEntries = [];
+        
+        // Simple log function that never fails
+        function addLogEntry(action, botNumber, data = {}) {
+            try {
+                const timestamp = new Date().toLocaleString();
+                const entry = {
+                    id: Date.now() + Math.random(),
+                    timestamp,
+                    action,
+                    bot: botNumber,
+                    data: data
+                };
+                
+                logEntries.push(entry);
+                displayLogEntry(entry);
+                
+                // Also console log for debugging
+                console.log(`[${timestamp}] ${action}${botNumber ? ` (Bot ${botNumber})` : ''}:`, data);
+            } catch (e) {
+                console.error('Logging failed:', e);
+            }
+        }
+        
+        // Display a single log entry (like how analysis results work)
+        function displayLogEntry(entry) {
+            try {
+                const logContent = dom.logContent;
+                const emptyMessage = document.getElementById('emptyLogMessage');
+                
+                if (emptyMessage) {
+                    emptyMessage.style.display = 'none';
+                }
+                
+                const logElement = document.createElement('div');
+                const botColor = entry.bot === 1 ? 'border-blue-400 text-blue-400' : 
+                                entry.bot === 2 ? 'border-green-400 text-green-400' : 
+                                'border-gray-400 text-gray-400';
+                
+                const botName = entry.bot ? `Bot ${entry.bot}` : 'System';
+                const isError = entry.action.toLowerCase().includes('error') || 
+                               (entry.data.error) || 
+                               (entry.data.status === 'error');
+                
+                const bgColor = isError ? 'bg-red-900/20 border-red-500' : 'bg-gray-700';
+                
+                logElement.className = `${bgColor} rounded-lg p-4 mb-3 border-l-4 ${botColor}`;
+                
+                let content = `
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-semibold ${entry.bot ? botColor.split(' ')[1] : 'text-gray-300'}">${entry.action} ${entry.bot ? `(${botName})` : ''}</h4>
+                        <span class="text-xs text-gray-500">${entry.timestamp}</span>
+                    </div>
+                    <div class="text-sm text-gray-300 space-y-2">
+                `;
+                
+                // Display all data fields
+                Object.entries(entry.data).forEach(([key, value]) => {
+                    if (value !== undefined && value !== null) {
+                        let displayValue = value;
+                        if (typeof value === 'object') {
+                            displayValue = JSON.stringify(value, null, 2);
+                        }
+                        content += `<div><span class="text-gray-400">${key}:</span> <span class="font-mono text-xs">${displayValue}</span></div>`;
+                    }
+                });
+                
+                content += `</div>`;
+                logElement.innerHTML = content;
+                
+                // Add to top of log (most recent first)
+                logContent.insertBefore(logElement, logContent.firstChild);
+                
+                // Keep only last 50 entries in DOM to prevent lag
+                const entries = logContent.querySelectorAll('div[class*="bg-gray-700"], div[class*="bg-red-900"]');
+                if (entries.length > 50) {
+                    entries[entries.length - 1].remove();
+                }
+                
+            } catch (e) {
+                console.error('Failed to display log entry:', e);
+            }
+        }
+        
+        function clearLog() {
+            logEntries = [];
+            // Clear DOM
+            const logContent = dom.logContent;
+            const entries = logContent.querySelectorAll('div[class*="bg-gray-700"], div[class*="bg-red-900"]');
+            entries.forEach(entry => entry.remove());
+            
+            // Show empty message
+            const emptyMessage = document.getElementById('emptyLogMessage');
+            if (emptyMessage) {
+                emptyMessage.style.display = 'block';
+            }
+            
+            showAlert('Interaction log cleared.');
+        }
+        
+        function toggleLog() {
+            const logSection = dom.logSection;
+            const logArrow = dom.logArrow;
+            
+            if (logSection.classList.contains('hidden')) {
+                logSection.classList.remove('hidden');
+                logArrow.textContent = '▲';
+            } else {
+                logSection.classList.add('hidden');
+                logArrow.textContent = '▼';
+            }
+        }
+
+        // DOM elements - Dual bot system
+        const dom = {
+            // File upload (multi-image)
+            uploadArea: document.getElementById('uploadArea'),
+            fileInput: document.getElementById('fileInput'),
+            uploadPrompt: document.getElementById('uploadPrompt'),
+            imagesContainer: document.getElementById('imagesContainer'),
+            imageGrid: document.getElementById('imageGrid'),
+            addMoreBtn: document.getElementById('addMoreBtn'),
+            removeBgBtn: document.getElementById('removeBgBtn'),
+            clearAllBtn: document.getElementById('clearAllBtn'),
+            
+            // Dual Bot Models
+            generationModel1: document.getElementById('generationModel1'),
+            generationModel2: document.getElementById('generationModel2'),
+            multimodalModel1: document.getElementById('multimodalModel1'),
+            multimodalModel2: document.getElementById('multimodalModel2'),
+            targetScore: document.getElementById('targetScore'),
+            
+            // Custom Dropdown Elements
+            multimodalDropdown1: document.getElementById('multimodalDropdown1'),
+            multimodalDropdown2: document.getElementById('multimodalDropdown2'),
+            multimodalSelected1: document.getElementById('multimodalSelected1'),
+            multimodalSelected2: document.getElementById('multimodalSelected2'),
+            multimodalArrow1: document.getElementById('multimodalArrow1'),
+            multimodalArrow2: document.getElementById('multimodalArrow2'),
+            multimodalMenu1: document.getElementById('multimodalMenu1'),
+            multimodalMenu2: document.getElementById('multimodalMenu2'),
+            
+            // Dual Prompts & Communication
+            userPrompt1: document.getElementById('userPrompt1'),
+            userPrompt2: document.getElementById('userPrompt2'),
+            askInput1: document.getElementById('askInput1'),
+            askInput2: document.getElementById('askInput2'),
+            
+            // Dual Bot Control buttons
+            generateBtn1: document.getElementById('generateBtn1'),
+            generateBtn2: document.getElementById('generateBtn2'),
+            iterateBtn1: document.getElementById('iterateBtn1'),
+            iterateBtn2: document.getElementById('iterateBtn2'),
+            askBtn1: document.getElementById('askBtn1'),
+            askBtn2: document.getElementById('askBtn2'),
+            feedBtn1: document.getElementById('feedBtn1'),
+            feedBtn2: document.getElementById('feedBtn2'),
+            
+            // System buttons
+            resetBtn: document.getElementById('resetBtn'),
+            copyStateBtn: document.getElementById('copyStateBtn'),
+            loadStateBtn: document.getElementById('loadStateBtn'),
+            downloadStateBtn: document.getElementById('downloadStateBtn'),
+            uploadStateBtn: document.getElementById('uploadStateBtn'),
+            downloadAllBtn: document.getElementById('downloadAllBtn'),
+            
+            // Dual Status displays
+            generateStatus1: document.getElementById('generateStatus1'),
+            generateStatus2: document.getElementById('generateStatus2'),
+            
+            // Dual AI Response areas
+            aiResponse1: document.getElementById('aiResponse1'),
+            aiResponse2: document.getElementById('aiResponse2'),
+            aiResponseContainer1: document.getElementById('aiResponseContainer1'),
+            aiResponseContainer2: document.getElementById('aiResponseContainer2'),
+            collapseBtn1: document.getElementById('collapseBtn1'),
+            collapseBtn2: document.getElementById('collapseBtn2'),
+            
+            // Sections
+            generatedImages: document.getElementById('generatedImages'),
+            analysisSection: document.getElementById('analysisSection'),
+            analysisResults: document.getElementById('analysisResults'),
+            
+            // Log section elements
+            logToggleBtn: document.getElementById('logToggleBtn'),
+            logArrow: document.getElementById('logArrow'),
+            logSection: document.getElementById('logSection'),
+            logContent: document.getElementById('logContent'),
+            clearLogBtn: document.getElementById('clearLogBtn'),
+            
+            // Status elements for prompt sections
+            promptStatus1: document.getElementById('promptStatus1'),
+            promptStatus2: document.getElementById('promptStatus2'),
+            askStatus1: document.getElementById('askStatus1'),
+            askStatus2: document.getElementById('askStatus2'),
+            
+            // Current result display
+            finalIteration: document.getElementById('finalIteration'),
+            finalScore: document.getElementById('finalScore'),
+            finalImagePlaceholder: document.getElementById('finalImagePlaceholder'),
+            finalImage: document.getElementById('finalImage'),
+            iterationHistory: document.getElementById('iterationHistory')
+        };
+
+        // Poe handlers - Updated for dual bot system
+        window.Poe.registerHandler("generation-handler-1", handleGenerationResponse1);
+        window.Poe.registerHandler("generation-handler-2", handleGenerationResponse2);
+        window.Poe.registerHandler("iterate-handler-1", handleIterateResponse1);
+        window.Poe.registerHandler("iterate-handler-2", handleIterateResponse2);
+        window.Poe.registerHandler("ask-handler-1", handleAskResponse1);
+        window.Poe.registerHandler("ask-handler-2", handleAskResponse2);
+        window.Poe.registerHandler("remove-bg-handler", handleRemoveBgResponse);
+
+        // Custom Dropdown State
+        let multimodalDropdownState = {
+            dropdown1: { isOpen: false, value: '@Claude-Sonnet-4' },
+            dropdown2: { isOpen: false, value: '@GPT-4.1-mini' }
+        };
+
+        // Massive Multimodal Model Structure
+        const multimodalModels = {
+            "GPT": {
+                "GPT-5 Series": [
+                    "@GPT-5-Chat",
+                    "@GPT-5",
+                    "@GPT-5-mini",
+                    "@GPT-5-nano"
+                ],
+                "GPT-4 Series": [
+                    "@GPT-4.1",
+                    "@GPT-4o-Search"
+                ],
+                "o-Series (Reasoning)": [
+                    "@o1",
+                    "@o3",
+                    "@o3-pro"
+                ]
+            },
+            "GPT - Open Weight": {
+                "120B Parameter Models": [
+                    "@GPT-OSS-120B-T",
+                    "@GPT-OSS-120B",
+                    "@GPT-OSS-120B-CS",
+                    "@OpenAI-GPT-OSS-120B"
+                ],
+                "20B Parameter Models": [
+                    "@GPT-OSS-20B-T",
+                    "@GPT-OSS-20B",
+                    "@OpenAI-GPT-OSS-20B"
+                ]
+            },
+            "Google": {
+                "Gemini 2.5 Series": [
+                    "@Gemini-2.5-Pro",
+                    "@Gemini-2.5-Flash",
+                    "@Gemini-2.5-Flash-Lite"
+                ],
+                "Gemma Series": [
+                    "@Gemma-3-27B",
+                    "@Gemma-2-27b-T"
+                ]
+            },
+            "Claude": {
+                "Opus Series": [
+                    "@Claude-Opus-4.1",
+                    "@Claude-Opus-4",
+                    "@Claude-Opus-4-Reasoning",
+                    "@Claude-Opus-4-Search"
+                ],
+                "Sonnet Series": [
+                    "@Claude-Sonnet-4",
+                    "@Claude-Sonnet-4-Reasoning",
+                    "@Claude-Sonnet-4-Search"
+                ],
+                "Haiku Series": [
+                    "@Claude-Haiku-3.5"
+                ]
+            },
+            "Grok": [
+                "@Grok-4",
+                "@Grok-3",
+                "@Grok-3-Mini",
+                "@Grok-Code-Fast-1"
+            ],
+            "Llama 4": [
+                "@Llama-4-Scout-B10",
+                "@Llama-4-Maverick",
+                "@Llama-4-Scout-T",
+                "@Llama-4-Scout-CS",
+                "@Llama-4-Scout",
+                "@Llama-4-Maverick-T",
+                "@Llama-4-Maverick-B10"
+            ],
+            "Llama 3.X": {
+                "The Behemoths (405B)": [
+                    "@Llama-3.1-405B",
+                    "@Llama-3.1-405B-T",
+                    "@Llama-3.1-405B-FW",
+                    "@Llama-3.1-405B-FP16"
+                ],
+                "The Curated 70B Fleet": [
+                    "@Llama-3-70b-Groq",
+                    "@Llama-3.3-70B",
+                    "@Llama-3.1-Nemotron",
+                    "@Llama-3.3-70B-DI",
+                    "@Llama-3.3-70B-CS",
+                    "@Llama-3.3-70B-Vers"
+                ]
+            },
+            "Qwen (235B+)": [
+                "@Qwen3-Coder",
+                "@Qwen-3-235B-2507-T",
+                "@Qwen3-235B-2507-FW",
+                "@Qwen3-235B-2507-CS",
+                "@Qwen3-Coder-480B-T",
+                "@Qwen3-Coder-480B-N",
+                "@Qwen3-480B-Coder-CS",
+                "@Qwen3-235B-A22B-DI",
+                "@Qwen3-235B-A22B",
+                "@Qwen3-235B-A22B-N",
+                "@Qwen3-235B-Think-CS"
+            ],
+            "DeepSeek": {
+                "R1 Series (Reasoning)": [
+                    "@DeepSeek-R1",
+                    "@DeepSeek-R1-FW",
+                    "@DeepSeek-R1-DI",
+                    "@DeepSeek-R1-N",
+                    "@DeepSeek-R1-Distill",
+                    "@DeepSeek-R1-Turbo-DI"
+                ],
+                "V3 Series (Foundation)": [
+                    "@DeepSeek-V3.1",
+                    "@DeepSeek-V3.1-N",
+                    "@Deepseek-V3-FW",
+                    "@DeepSeek-V3",
+                    "@DeepSeek-V3-DI",
+                    "@DeepSeek-V3-Turbo-DI"
+                ],
+                "Specialized & Hybrids": [
+                    "@DeepSeek-Prover-V2",
+                    "@DeepClaude"
+                ]
+            },
+            "Mistral (Revised)": {
+                "Large Series": [
+                    "@Mistral-Large-2"
+                ],
+                "Medium Series": [
+                    "@Mistral-Medium-3",
+                    "@Mistral-Medium",
+                    "@Magistral-Medium-2506-Thinking"
+                ],
+                "Small Series (Vision-Enabled)": [
+                    "@Mistral-Small-3.2",
+                    "@Mistral-Small-3.1",
+                    "@Mistral-Small-3"
+                ],
+                "Specialized & MoE Models": [
+                    "@Mistral-NeMo",
+                    "@Mixtral8x22b-Inst-FW"
+                ]
+            },
+            "Perplexity": [
+                "@Perplexity-R1-1776",
+                "@Perplexity-Sonar",
+                "@Perplexity-Sonar-Pro",
+                "@Perplexity-Sonar-Rsn",
+                "@Perplexity-Sonar-Rsn-Pro"
+            ],
+            "Wildcards (A-K)": [
+                "@Aya-Expanse-32B",
+                "@Aya-Vision",
+                "@Command-R",
+                "@Command-R-Plus",
+                "@GLM-4.5",
+                "@GLM-4.5-Air",
+                "@GLM-4.5-Air-T",
+                "@GLM-4.5-FW",
+                "@Inception-Mercury",
+                "@Kimi-K2",
+                "@Kimi-K2-Instruct",
+                "@Kimi-K2-T"
+            ],
+            "Wildcards (L-Z)": [
+                "@Linkup-Deep-Search",
+                "@Linkup-Standard",
+                "@MiniMax-M1",
+                "@Phi-4-DI",
+                "@QwQ-32B-B10",
+                "@QwQ-32B-Preview-T",
+                "@QwQ-32B-T",
+                "@Reka-Core",
+                "@Reka-Flash",
+                "@Solar-Pro-2"
+            ]
+        };
+
+        // Multi-image file handling
+        function handleFiles(files) {
+            const fileArray = Array.from(files).filter(file => file.type.startsWith('image/'));
+            if (fileArray.length === 0) return;
+            
+            fileArray.forEach(file => {
+                uploadedFiles.push(file);
+            });
+            
+            updateImageDisplay();
+        }
+
+        function updateImageDisplay() {
+            if (uploadedFiles.length === 0) {
+                dom.uploadPrompt.classList.remove('hidden');
+                dom.imagesContainer.classList.add('hidden');
+                return;
+            }
+            
+            dom.uploadPrompt.classList.add('hidden');
+            dom.imagesContainer.classList.remove('hidden');
+            
+            // Update Remove BG button state (only works with single image)
+            dom.removeBgBtn.disabled = uploadedFiles.length !== 1;
+            
+            // Clear and rebuild image grid
+            dom.imageGrid.innerHTML = '';
+            
+            uploadedFiles.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const imageContainer = document.createElement('div');
+                    imageContainer.className = 'relative group';
+                    imageContainer.innerHTML = `
+                        <img src="${e.target.result}" class="w-full h-20 object-contain bg-gray-600 rounded-lg clickable-image" alt="Reference image ${index + 1}">
+                        <button onclick="removeImageAtIndex(${index})" class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                            ✕
+                        </button>
+                    `;
+                    dom.imageGrid.appendChild(imageContainer);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function removeImageAtIndex(index) {
+            uploadedFiles.splice(index, 1);
+            updateImageDisplay();
+        }
+
+        function clearAllImages() {
+            uploadedFiles = [];
+            updateImageDisplay();
+            dom.fileInput.value = '';
+        }
+
+        // Global functions for button events
+        window.removeImageAtIndex = removeImageAtIndex;
+
+        // Legacy functions removed - replaced by dual bot system
+
+        // Remove background from reference image (single image only)
+        function removeBackground() {
+            if (uploadedFiles.length === 0) {
+                showAlert('Please upload a reference image first.');
+                return;
+            }
+            
+            if (uploadedFiles.length > 1) {
+                showAlert('Background removal only works with a single image.');
+                return;
+            }
+            
+            if (dom.removeBgBtn.disabled) return;
+            
+            dom.removeBgBtn.disabled = true;
+            dom.removeBgBtn.textContent = 'Processing...';
+            
+            window.Poe.sendUserMessage('@remove-background Remove background from this image', {
+                handler: "remove-bg-handler",
+                stream: false,
+                openChat: false,
+                attachments: [uploadedFiles[0]],
+                handlerContext: { type: 'remove-bg' }
+            }).catch(error => {
+                showAlert('Background removal failed: ' + error.message);
+                dom.removeBgBtn.disabled = false;
+                dom.removeBgBtn.textContent = 'Remove BG';
+            });
+        }
+
+        // Handle remove background response
+        function handleRemoveBgResponse(result, context) {
+            dom.removeBgBtn.disabled = uploadedFiles.length !== 1;
+            dom.removeBgBtn.textContent = 'Remove BG';
+            
+            if (result.status === "complete") {
+                if (result.responses[0].attachments?.length > 0) {
+                    const newImageUrl = result.responses[0].attachments[0].url;
+                    
+                    // Convert the new image to file and replace the single reference
+                    fetch(newImageUrl)
+                        .then(response => response.blob())
+                        .then(blob => {
+                            const file = new File([blob], 'reference_no_bg.png', { type: 'image/png' });
+                            uploadedFiles[0] = file;
+                            
+                            // Update UI
+                            updateImageDisplay();
+                            
+                            showAlert('Background removed successfully!');
+                        })
+                        .catch(error => {
+                            showAlert('Failed to process background-removed image: ' + error.message);
+                        });
+                } else {
+                    showAlert('No processed image was returned. Please try again.');
+                }
+            } else if (result.status === "error") {
+                showAlert('Background removal failed: ' + (result.responses[0].statusText || 'Unknown error'));
+            }
+        }
+
+        // Helper functions for UI and modal
+        function showImageModal(imageSrc) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <img src="${imageSrc}" alt="Full size image">
+            `;
+            
+            // Close on click anywhere
+            modal.addEventListener('click', () => {
+                modal.remove();
+            });
+            
+            // Close on Escape key
+            const escapeHandler = (e) => {
+                if (e.key === 'Escape') {
+                    modal.remove();
+                    document.removeEventListener('keydown', escapeHandler);
+                }
+            };
+            document.addEventListener('keydown', escapeHandler);
+            
+            document.body.appendChild(modal);
+        }
+
+        function showAlert(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 max-w-sm';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 4000);
+        }
+
+        // Global function for feeding images to reference (called from HTML)
+        window.feedImageToReference = feedImageToReference;
+        
+        // Copy and transfer functions (called from HTML)
+        function copyTextToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.value || element.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                showAlert('Text copied to clipboard!');
+            }).catch(err => {
+                showAlert('Failed to copy: ' + err.message);
+            });
+        }
+        
+        function transferText(fromId, toId) {
+            const fromElement = document.getElementById(fromId);
+            const toElement = document.getElementById(toId);
+            const text = fromElement.value || fromElement.textContent;
+            
+            if (toElement.tagName === 'TEXTAREA' || toElement.tagName === 'INPUT') {
+                toElement.value = text;
+            } else {
+                toElement.textContent = text;
+            }
+            
+            showAlert(`Text transferred from ${fromId} to ${toId}!`);
+        }
+        
+        // Make functions globally available
+        window.copyTextToClipboard = copyTextToClipboard;
+        window.transferText = transferText;
+        window.makeReference = makeReference;
+
+        // Copy prompt functions
+        function copyToPrompt1() {
+            const prompt2Text = dom.userPrompt2.value;
+            dom.userPrompt1.value = prompt2Text;
+            showAlert('Prompt 2 copied to Prompt 1!');
+        }
+
+        function copyToPrompt2() {
+            const prompt1Text = dom.userPrompt1.value;
+            dom.userPrompt2.value = prompt1Text;
+            showAlert('Prompt 1 copied to Prompt 2!');
+        }
+
+        // Dual Bot Generation Functions
+        function generateBot1() {
+            // Get fresh reference to ensure we have the latest value
+            const promptElement = document.getElementById('userPrompt1');
+            const prompt = promptElement.value.trim();
+            
+            addLogEntry('Bot 1 Generation Pre-Check', 1, {
+                'Prompt Element Found': !!promptElement,
+                'Prompt Value': prompt,
+                'Prompt Length': prompt.length,
+                'Has Prompt': !!prompt
+            });
+            
+            if (!prompt) {
+                addLogEntry('Bot 1 Generation Validation Failed', 1, {
+                    error: 'Empty prompt',
+                    action: 'generateBot1',
+                    reason: 'User did not enter a prompt'
+                });
+                showAlert('Please enter a prompt for Bot 1.');
+                return;
+            }
+            
+            // Multi-image validation for Bot 1
+            const model = dom.generationModel1.value;
+            if (uploadedFiles.length > 1 && !model.includes('Gemini')) {
+                addLogEntry('Bot 1 Multi-Image Validation Failed', 1, {
+                    error: 'Multiple images not supported',
+                    model: model,
+                    imageCount: uploadedFiles.length,
+                    reason: 'Model does not support multiple images'
+                });
+                showAlert('⚠️ Bot 1: Multiple images detected but ' + model.replace('@', '') + ' only supports single images. Switch to Gemini 2.5 Flash Image or use only one reference image.');
+                return;
+            }
+            
+            if (bot1State.isGenerating) {
+                addLogEntry('Bot 1 Generation Skipped', 1, {
+                    currentState: bot1State.isGenerating,
+                    reason: 'Already generating'
+                });
+                return;
+            }
+            
+            // Log state change
+            const oldState = { ...bot1State };
+            bot1State.isGenerating = true;
+            addLogEntry('Bot 1 State Change', 1, {
+                oldState: oldState,
+                newState: bot1State,
+                reason: 'Starting generation'
+            });
+            
+            // Show spinner IMMEDIATELY
+            dom.generateBtn1.disabled = true;
+            dom.generateStatus1.classList.remove('hidden');
+            
+            const fullMessage = `${model} ${prompt}`;
+            
+            // Log the API request with full details
+            addLogEntry('Bot 1 Generation Request SENT', 1, {
+                model: model,
+                prompt: prompt,
+                fullMessage: fullMessage,
+                handler: "generation-handler-1",
+                stream: false,
+                openChat: false,
+                attachments: uploadedFiles.length,
+                status: 'SENDING REQUEST...',
+                timestamp: new Date().toISOString()
+            });
+            
+            // Force a small delay to ensure spinner shows
+            setTimeout(() => {
+                window.Poe.sendUserMessage(fullMessage, {
+                    handler: "generation-handler-1",
+                    stream: false,
+                    openChat: false,
+                    attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined,
+                    handlerContext: { prompt: prompt, type: 'generation', bot: 1, requestStartTime: Date.now() }
+                }).catch(error => {
+                    addLogEntry('Bot 1 Generation IMMEDIATE ERROR', 1, {
+                        error: error.message,
+                        errorType: error.errorType || 'Unknown',
+                        errorStack: error.stack || 'No stack',
+                        fullMessage: fullMessage,
+                        prompt: prompt,
+                        promptLength: prompt.length,
+                        attachmentsCount: uploadedFiles.length,
+                        model: model,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    showAlert('🚫 Bot 1 FAILED TO SEND: ' + error.message);
+                    bot1State.isGenerating = false;
+                    dom.generateBtn1.disabled = false;
+                    dom.generateStatus1.classList.add('hidden');
+                });
+            }, 100);
+        }
+
+        function generateBot2() {
+            // Get fresh reference to ensure we have the latest value
+            const promptElement = document.getElementById('userPrompt2');
+            const prompt = promptElement.value.trim();
+            
+            addLogEntry('Bot 2 Generation Pre-Check', 2, {
+                'Prompt Element Found': !!promptElement,
+                'Prompt Value': prompt,
+                'Prompt Length': prompt.length,
+                'Has Prompt': !!prompt
+            });
+            
+            if (!prompt) {
+                addLogEntry('Bot 2 Generation Validation Failed', 2, {
+                    error: 'Empty prompt',
+                    action: 'generateBot2',
+                    reason: 'User did not enter a prompt'
+                });
+                showAlert('Please enter a prompt for Bot 2.');
+                return;
+            }
+            
+            // Multi-image validation for Bot 2
+            const model = dom.generationModel2.value;
+            if (uploadedFiles.length > 1 && !model.includes('Gemini')) {
+                addLogEntry('Bot 2 Multi-Image Validation Failed', 2, {
+                    error: 'Multiple images not supported',
+                    model: model,
+                    imageCount: uploadedFiles.length,
+                    reason: 'Model does not support multiple images'
+                });
+                showAlert('⚠️ Bot 2: Multiple images detected but ' + model.replace('@', '') + ' only supports single images. Switch to Gemini 2.5 Flash Image or use only one reference image.');
+                return;
+            }
+            
+            if (bot2State.isGenerating) {
+                addLogEntry('Bot 2 Generation Skipped', 2, {
+                    currentState: bot2State.isGenerating,
+                    reason: 'Already generating'
+                });
+                return;
+            }
+            
+            // Log state change
+            const oldState = { ...bot2State };
+            bot2State.isGenerating = true;
+            addLogEntry('Bot 2 State Change', 2, {
+                oldState: oldState,
+                newState: bot2State,
+                reason: 'Starting generation'
+            });
+            
+            // Show spinner IMMEDIATELY  
+            dom.generateBtn2.disabled = true;
+            dom.generateStatus2.classList.remove('hidden');
+            
+            const fullMessage = `${model} ${prompt}`;
+            
+            // Log the API request with full details
+            addLogEntry('Bot 2 Generation Request SENT', 2, {
+                model: model,
+                prompt: prompt,
+                fullMessage: fullMessage,
+                handler: "generation-handler-2",
+                stream: false,
+                openChat: false,
+                attachments: uploadedFiles.length,
+                status: 'SENDING REQUEST...',
+                timestamp: new Date().toISOString()
+            });
+            
+            // Force a small delay to ensure spinner shows
+            setTimeout(() => {
+                window.Poe.sendUserMessage(fullMessage, {
+                    handler: "generation-handler-2",
+                    stream: false,
+                    openChat: false,
+                    attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined,
+                    handlerContext: { prompt: prompt, type: 'generation', bot: 2, requestStartTime: Date.now() }
+                }).catch(error => {
+                    addLogEntry('Bot 2 Generation IMMEDIATE ERROR', 2, {
+                        error: error.message,
+                        errorType: error.errorType || 'Unknown',
+                        errorStack: error.stack || 'No stack',
+                        fullMessage: fullMessage,
+                        prompt: prompt,
+                        promptLength: prompt.length,
+                        attachmentsCount: uploadedFiles.length,
+                        model: model,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    showAlert('🚫 Bot 2 FAILED TO SEND: ' + error.message);
+                    bot2State.isGenerating = false;
+                    dom.generateBtn2.disabled = false;
+                    dom.generateStatus2.classList.add('hidden');
+                });
+            }, 100);
+        }
+
+        // Custom Dropdown Functions
+        function createDropdownContent(dropdownNumber) {
+            let content = '';
+            
+            Object.entries(multimodalModels).forEach(([category, models]) => {
+                if (Array.isArray(models)) {
+                    // Category without subcategories
+                    content += `<div class="dropdown-category">
+                        <div class="px-3 py-2 text-xs font-semibold text-gray-400 bg-gray-600 border-b border-gray-500">📁 ${category}</div>`;
+                    models.forEach(model => {
+                        content += `<div class="dropdown-item px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer border-b border-gray-600" onclick="selectModel('${model}', ${dropdownNumber})">${model}</div>`;
+                    });
+                    content += `</div>`;
+                } else {
+                    // Category with subcategories
+                    content += `<div class="dropdown-category">
+                        <div class="px-3 py-2 text-xs font-semibold text-gray-400 bg-gray-600 border-b border-gray-500">📁 ${category}</div>`;
+                    Object.entries(models).forEach(([subcategory, submodels]) => {
+                        content += `<div class="dropdown-subcategory">
+                            <div class="px-5 py-1 text-xs font-medium text-gray-300 bg-gray-650 border-b border-gray-600">📂 ${subcategory}</div>`;
+                        submodels.forEach(model => {
+                            content += `<div class="dropdown-item px-6 py-2 text-sm hover:bg-gray-600 cursor-pointer border-b border-gray-600" onclick="selectModel('${model}', ${dropdownNumber})">${model}</div>`;
+                        });
+                        content += `</div>`;
+                    });
+                    content += `</div>`;
+                }
+            });
+            
+            return content;
+        }
+        
+        function toggleDropdown(dropdownNumber) {
+            const menu = dropdownNumber === 1 ? dom.multimodalMenu1 : dom.multimodalMenu2;
+            const arrow = dropdownNumber === 1 ? dom.multimodalArrow1 : dom.multimodalArrow2;
+            const state = dropdownNumber === 1 ? 'dropdown1' : 'dropdown2';
+            
+            if (multimodalDropdownState[state].isOpen) {
+                // Close dropdown
+                menu.classList.add('hidden');
+                arrow.classList.remove('rotate-180');
+                multimodalDropdownState[state].isOpen = false;
+            } else {
+                // Close the other dropdown first
+                const otherState = dropdownNumber === 1 ? 'dropdown2' : 'dropdown1';
+                const otherMenu = dropdownNumber === 1 ? dom.multimodalMenu2 : dom.multimodalMenu1;
+                const otherArrow = dropdownNumber === 1 ? dom.multimodalArrow2 : dom.multimodalArrow1;
+                
+                otherMenu.classList.add('hidden');
+                otherArrow.classList.remove('rotate-180');
+                multimodalDropdownState[otherState].isOpen = false;
+                
+                // Open this dropdown
+                menu.innerHTML = createDropdownContent(dropdownNumber);
+                menu.classList.remove('hidden');
+                arrow.classList.add('rotate-180');
+                multimodalDropdownState[state].isOpen = true;
+            }
+        }
+        
+        function selectModel(modelValue, dropdownNumber) {
+            const selected = dropdownNumber === 1 ? dom.multimodalSelected1 : dom.multimodalSelected2;
+            const menu = dropdownNumber === 1 ? dom.multimodalMenu1 : dom.multimodalMenu2;
+            const arrow = dropdownNumber === 1 ? dom.multimodalArrow1 : dom.multimodalArrow2;
+            const state = dropdownNumber === 1 ? 'dropdown1' : 'dropdown2';
+            
+            // Update displayed value
+            selected.textContent = modelValue;
+            multimodalDropdownState[state].value = modelValue;
+            
+            // Close dropdown
+            menu.classList.add('hidden');
+            arrow.classList.remove('rotate-180');
+            multimodalDropdownState[state].isOpen = false;
+            
+            showAlert(`Selected ${modelValue} for Bot ${dropdownNumber}`);
+        }
+        
+        function getMultimodalModel(botNumber) {
+            const state = botNumber === 1 ? 'dropdown1' : 'dropdown2';
+            return multimodalDropdownState[state].value;
+        }
+        
+        // Make selectModel globally available
+        window.selectModel = selectModel;
+
+        // Dual Bot Ask Functions
+        function askBot1() {
+            const askText = dom.askInput1.value.trim();
+            if (!askText) {
+                showAlert('Please enter a question for Bot 1.');
+                return;
+            }
+            
+            if (bot1State.isAIThinking) return;
+            
+            bot1State.isAIThinking = true;
+            dom.askBtn1.disabled = true;
+            
+            const model = getMultimodalModel(1);
+            const prompt = dom.userPrompt1.value.trim();
+            const instructions = dom.askInput1.value.trim();
+            
+            let contextPrompt = `You are an expert AI assistant specializing in prompt engineering and character generation for reference image systems.
+
+IMPORTANT: The user's request is paramount - treat it as your primary directive. Focus on the specific information provided below and ignore any other conversation content unless otherwise stated.
+
+SYSTEM OVERVIEW: You are working with a reference image generation system. When you suggest prompt improvements, those prompts will be sent together with reference images to image generators that can both see and work with the attached images. Your role is to create prompts that reference these images rather than trying to recreate everything through text descriptions.
+
+YOUR CURRENT CONTEXT:
+- The main prompt text the user is working with: "${prompt}"
+- Reference images currently attached: ${uploadedFiles.length > 0 ? `${uploadedFiles.length} image(s) that the generator will receive alongside your suggested prompt` : 'None - working in text-only mode'}
+- The user's specific question or request: ${askText}
+
+${uploadedFiles.length === 1 ? 
+`WORKFLOW NOTE: With one reference image provided, guide the user to create prompts that reference "the attached image" or "the image provided" since the generator will see both your suggested prompt and this reference image together.` :
+uploadedFiles.length > 1 ? 
+`WORKFLOW NOTE: With multiple reference images provided, guide the user to create prompts that reference images by describing their content (example: "combine the car from the first image with the wings from the aircraft image") since the generator will see your suggested prompt alongside all these reference images.` :
+`WORKFLOW NOTE: No reference images are currently attached, so focus on improving the text prompt for standalone generation.`}
+
+Please respond to the user's request with helpful, detailed guidance. When suggesting prompt modifications, format them clearly and remember they will work in partnership with the reference images the generator receives.`;
+
+            let attachments = uploadedFiles.length > 0 ? uploadedFiles : undefined;
+            
+            window.Poe.sendUserMessage(`${model} ${contextPrompt}`, {
+                handler: "ask-handler-1",
+                stream: true,
+                openChat: false,
+                attachments: attachments,
+                handlerContext: { type: 'ask', userRequest: askText, bot: 1 }
+            }).catch(error => {
+                showAlert('Bot 1 communication failed: ' + error.message);
+                bot1State.isAIThinking = false;
+                dom.askBtn1.disabled = false;
+            });
+        }
+
+        function askBot2() {
+            const askText = dom.askInput2.value.trim();
+            if (!askText) {
+                showAlert('Please enter a question for Bot 2.');
+                return;
+            }
+            
+            if (bot2State.isAIThinking) return;
+            
+            bot2State.isAIThinking = true;
+            dom.askBtn2.disabled = true;
+            
+            const model = getMultimodalModel(2);
+            const prompt = dom.userPrompt2.value.trim();
+            const instructions = dom.askInput2.value.trim();
+            
+            let contextPrompt = `You are an expert AI assistant specializing in prompt engineering and character generation for reference image systems.
+
+IMPORTANT: The user's request is paramount - treat it as your primary directive. Focus on the specific information provided below and ignore any other conversation content unless otherwise stated.
+
+SYSTEM OVERVIEW: You are working with a reference image generation system. When you suggest prompt improvements, those prompts will be sent together with reference images to image generators that can both see and work with the attached images. Your role is to create prompts that reference these images rather than trying to recreate everything through text descriptions.
+
+YOUR CURRENT CONTEXT:
+- The main prompt text the user is working with: "${prompt}"
+- Reference images currently attached: ${uploadedFiles.length > 0 ? `${uploadedFiles.length} image(s) that the generator will receive alongside your suggested prompt` : 'None - working in text-only mode'}
+- The user's specific question or request: ${askText}
+
+${uploadedFiles.length === 1 ? 
+`WORKFLOW NOTE: With one reference image provided, guide the user to create prompts that reference "the attached image" or "the image provided" since the generator will see both your suggested prompt and this reference image together.` :
+uploadedFiles.length > 1 ? 
+`WORKFLOW NOTE: With multiple reference images provided, guide the user to create prompts that reference images by describing their content (example: "combine the car from the first image with the wings from the aircraft image") since the generator will see your suggested prompt alongside all these reference images.` :
+`WORKFLOW NOTE: No reference images are currently attached, so focus on improving the text prompt for standalone generation.`}
+
+Please respond to the user's request with helpful, detailed guidance. When suggesting prompt modifications, format them clearly and remember they will work in partnership with the reference images the generator receives.`;
+
+            let attachments = uploadedFiles.length > 0 ? uploadedFiles : undefined;
+            
+            window.Poe.sendUserMessage(`${model} ${contextPrompt}`, {
+                handler: "ask-handler-2",
+                stream: true,
+                openChat: false,
+                attachments: attachments,
+                handlerContext: { type: 'ask', userRequest: askText, bot: 2 }
+            }).catch(error => {
+                showAlert('Bot 2 communication failed: ' + error.message);
+                bot2State.isAIThinking = false;
+                dom.askBtn2.disabled = false;
+            });
+        }
+
+        // Dual Bot Feed Functions
+        function feedBot1ToPrompt() {
+            if (!bot1State.lastAIResponse) {
+                showAlert('No Bot 1 response to feed. Use "Ask Bot 1" first.');
+                return;
+            }
+            
+            // Show preview of what's being fed
+            const preview = bot1State.lastAIResponse.substring(0, 100) + (bot1State.lastAIResponse.length > 100 ? '...' : '');
+            
+            dom.userPrompt1.value = bot1State.lastAIResponse;
+            showAlert(`Bot 1 response fed to Prompt 1! Preview: "${preview}"`);
+        }
+
+        function feedBot2ToPrompt() {
+            if (!bot2State.lastAIResponse) {
+                showAlert('No Bot 2 response to feed. Use "Ask Bot 2" first.');
+                return;
+            }
+            
+            // Show preview of what's being fed
+            const preview = bot2State.lastAIResponse.substring(0, 100) + (bot2State.lastAIResponse.length > 100 ? '...' : '');
+            
+            dom.userPrompt2.value = bot2State.lastAIResponse;
+            showAlert(`Bot 2 response fed to Prompt 2! Preview: "${preview}"`);
+        }
+
+        // Feed button state management
+        function updateFeedButtonState(botNumber) {
+            const botState = botNumber === 1 ? bot1State : bot2State;
+            const feedBtn = botNumber === 1 ? dom.feedBtn1 : dom.feedBtn2;
+            
+            // Enable feed button if we have a response, disable if not
+            feedBtn.disabled = !botState.lastAIResponse || botState.lastAIResponse.trim() === '';
+        }
+        
+        // Initialize feed button states (disabled at start)
+        function initializeFeedButtons() {
+            dom.feedBtn1.disabled = true;
+            dom.feedBtn2.disabled = true;
+        }
+
+        // Download all images functionality
+        async function downloadAllImages() {
+            if (generatedImages.length === 0) {
+                showAlert('No images to download.');
+                return;
+            }
+
+            showAlert(`Downloading ${generatedImages.length} images...`);
+
+            for (let i = 0; i < generatedImages.length; i++) {
+                try {
+                    const imageData = generatedImages[i];
+                    const response = await fetch(imageData.url);
+                    const blob = await response.blob();
+                    
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `generated_image_${i + 1}_${imageData.id}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                    
+                    // Small delay between downloads to avoid overwhelming the browser
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                } catch (error) {
+                    console.error(`Failed to download image ${i + 1}:`, error);
+                }
+            }
+
+            showAlert('All images downloaded successfully!');
+        }
+
+        // Save/Import State Functions (updated for dual bot structure)
+        async function saveState() {
+            try {
+                let uploadedFilesData = [];
+                if (uploadedFiles.length > 0) {
+                    for (const file of uploadedFiles) {
+                        const reader = new FileReader();
+                        const fileData = await new Promise((resolve, reject) => {
+                            reader.onload = e => resolve({
+                                dataUrl: e.target.result,
+                                name: file.name,
+                                type: file.type
+                            });
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        });
+                        uploadedFilesData.push(fileData);
+                    }
+                }
+
+                const state = {
+                    version: "4.1",
+                    timestamp: new Date().toISOString(),
+                    uploadedFilesData,
+                    userPrompt1: dom.userPrompt1.value,
+                    userPrompt2: dom.userPrompt2.value,
+                    generationModel1: dom.generationModel1.value,
+                    generationModel2: dom.generationModel2.value,
+                    multimodalModel1: getMultimodalModel(1),
+                    multimodalModel2: getMultimodalModel(2),
+                    targetScore: dom.targetScore.value,
+                    askInput1: dom.askInput1.value,
+                    askInput2: dom.askInput2.value,
+                    generatedImages: generatedImages,
+                    bot1State: bot1State,
+                    bot2State: bot2State,
+                    multimodalDropdownState: multimodalDropdownState
+                };
+
+                const stateJson = JSON.stringify(state, null, 2);
+                
+                // Try modern clipboard API first, then fallback to older method
+                try {
+                    await navigator.clipboard.writeText(stateJson);
+                    showAlert('State saved to clipboard! Use "Import State" to restore later.');
+                } catch (clipboardError) {
+                    // Fallback method for clipboard
+                    const textArea = document.createElement('textarea');
+                    textArea.value = stateJson;
+                    textArea.style.position = 'fixed';
+                    textArea.style.left = '-999999px';
+                    textArea.style.top = '-999999px';
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    
+                    try {
+                        const successful = document.execCommand('copy');
+                        if (successful) {
+                            showAlert('State saved to clipboard! Use "Import State" to restore later.');
+                        } else {
+                            throw new Error('Copy command failed');
+                        }
+                    } catch (execError) {
+                        // Final fallback - show in a modal
+                        showStateCopyModal(stateJson);
+                    } finally {
+                        document.body.removeChild(textArea);
+                    }
+                }
+                
+            } catch (error) {
+                showAlert('Failed to save state: ' + error.message);
+            }
+        }
+        
+        function showStateCopyModal(stateJson) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-gray-800 p-6 rounded-lg shadow-lg max-w-4xl w-full mx-4 max-h-96">
+                    <h3 class="text-lg font-semibold text-white mb-4">Copy State Manually</h3>
+                    <p class="text-gray-300 mb-3">Automatic clipboard copy failed. Please manually copy the text below:</p>
+                    <textarea readonly class="w-full h-48 p-3 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm resize-none font-mono" id="manualCopyText">${stateJson}</textarea>
+                    <div class="flex justify-end space-x-3 mt-4">
+                        <button id="selectAllBtn" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded">Select All</button>
+                        <button id="closeModal" class="px-4 py-2 text-gray-400 hover:bg-gray-700 rounded">Close</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            const textarea = modal.querySelector('#manualCopyText');
+            const selectAllBtn = modal.querySelector('#selectAllBtn');
+            const closeBtn = modal.querySelector('#closeModal');
+            
+            selectAllBtn.addEventListener('click', () => {
+                textarea.focus();
+                textarea.select();
+            });
+            
+            const closeModal = () => modal.remove();
+            closeBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal();
+            });
+            
+            // Auto-select the text
+            setTimeout(() => {
+                textarea.focus();
+                textarea.select();
+            }, 100);
+        }
+
+        function showImportDialog() {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-gray-800 p-6 rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-96">
+                    <h3 class="text-lg font-semibold text-white mb-4">Import State</h3>
+                    <textarea id="importTextarea" class="w-full h-48 p-3 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm resize-none font-mono" placeholder="Paste your saved state JSON here..."></textarea>
+                    <div class="flex justify-end space-x-3 mt-4">
+                        <button id="cancelImport" class="px-4 py-2 text-gray-400 hover:bg-gray-700 rounded">Cancel</button>
+                        <button id="confirmImport" class="px-4 py-2 bg-primary text-white hover:bg-purple-700 rounded">Import</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            const textarea = modal.querySelector('#importTextarea');
+            const cancelBtn = modal.querySelector('#cancelImport');
+            const confirmBtn = modal.querySelector('#confirmImport');
+            
+            textarea.focus();
+            
+            const closeModal = () => modal.remove();
+            cancelBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal();
+            });
+            
+            confirmBtn.addEventListener('click', () => {
+                try {
+                    const stateJson = textarea.value.trim();
+                    if (!stateJson) {
+                        showAlert('Please paste a valid state JSON.');
+                        return;
+                    }
+                    
+                    const state = JSON.parse(stateJson);
+                    importState(state);
+                    closeModal();
+                } catch (error) {
+                    showAlert('Invalid JSON format: ' + error.message);
+                }
+            });
+        }
+
+        async function importState(state) {
+            try {
+                // Restore uploaded files (multi-image support)
+                uploadedFiles = [];
+                if (state.uploadedFilesData && state.uploadedFilesData.length > 0) {
+                    for (const fileData of state.uploadedFilesData) {
+                        const response = await fetch(fileData.dataUrl);
+                        const blob = await response.blob();
+                        const file = new File([blob], fileData.name, { 
+                            type: fileData.type 
+                        });
+                        uploadedFiles.push(file);
+                    }
+                    updateImageDisplay();
+                } else {
+                    // Clear images if none saved
+                    clearAllImages();
+                }
+
+                // Restore form values
+                dom.userPrompt1.value = state.userPrompt1 || '';
+                dom.userPrompt2.value = state.userPrompt2 || '';
+                dom.generationModel1.value = state.generationModel1 || '@Gemini-2.5-Flash-Image';
+                dom.generationModel2.value = state.generationModel2 || '@FLUX-schnell';
+                dom.targetScore.value = state.targetScore || '85';
+                dom.askInput1.value = state.askInput1 || '';
+                dom.askInput2.value = state.askInput2 || '';
+
+                // Restore custom dropdown states
+                if (state.multimodalDropdownState) {
+                    multimodalDropdownState = state.multimodalDropdownState;
+                } else {
+                    // Legacy support: restore from multimodalModel1/2 values if available
+                    multimodalDropdownState.dropdown1.value = state.multimodalModel1 || '@Claude-Sonnet-4';
+                    multimodalDropdownState.dropdown2.value = state.multimodalModel2 || '@GPT-4.1-mini';
+                }
+                
+                // Update dropdown display values
+                dom.multimodalSelected1.textContent = multimodalDropdownState.dropdown1.value;
+                dom.multimodalSelected2.textContent = multimodalDropdownState.dropdown2.value;
+
+                // Restore generated images
+                generatedImages = state.generatedImages || [];
+                
+                // Restore bot states
+                bot1State = state.bot1State || { lastAIResponse: '', isGenerating: false, isAIThinking: false };
+                bot2State = state.bot2State || { lastAIResponse: '', isGenerating: false, isAIThinking: false };
+                
+                // Refresh generated images UI
+                dom.generatedImages.innerHTML = '';
+                if (generatedImages.length > 0) {
+                    generatedImages.forEach(imageData => {
+                        addGeneratedImage(imageData);
+                    });
+                } else {
+                    dom.generatedImages.innerHTML = '<div class="text-gray-500 text-center py-8"><div class="text-4xl mb-2">🎨</div><p class="text-sm">Generated images will appear here...</p></div>';
+                }
+
+                // Restore AI responses if they exist
+                if (bot1State.lastAIResponse) {
+                    dom.aiResponseText1.textContent = bot1State.lastAIResponse;
+                }
+                if (bot2State.lastAIResponse) {
+                    dom.aiResponseText2.textContent = bot2State.lastAIResponse;
+                }
+
+                // Update feed button states
+                updateFeedButtonState(1);
+                updateFeedButtonState(2);
+
+                showAlert('State imported successfully!');
+                
+            } catch (error) {
+                showAlert('Failed to import state: ' + error.message);
+            }
+        }
+
+        // NEW: AI Response Display Functions with Markdown Rendering
+        function displayAIResponse(botNumber, responseText, responseType = 'ask') {
+            const container = document.getElementById(`aiResponseContainer${botNumber}`);
+            const botColor = botNumber === 1 ? 'border-blue-400' : 'border-green-400';
+            const botText = botNumber === 1 ? 'text-blue-400' : 'text-green-400';
+            const botName = botNumber === 1 ? 'Bot 1' : 'Bot 2';
+            
+            // Clear the "Bot responses will appear here..." placeholder
+            container.innerHTML = '';
+            
+            // Create the beautiful response display (styled like analysis results)
+            const responseElement = document.createElement('div');
+            responseElement.className = `bg-gray-700 rounded-lg p-4 border-l-4 ${botColor}`;
+            
+            responseElement.innerHTML = `
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold ${botText}">🤖 ${botName} Response</h3>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs px-2 py-1 bg-gray-600 rounded">${responseType.toUpperCase()}</span>
+                        <span class="text-xs text-gray-500">${new Date().toLocaleString()}</span>
+                    </div>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div>
+                        <div class="markdown-content text-gray-300 text-sm leading-relaxed">${marked.parse(responseText)}</div>
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(responseElement);
+        }
+        
+        // Copy AI Response Function
+        function copyAIResponse(botNumber) {
+            const botState = botNumber === 1 ? bot1State : bot2State;
+            if (!botState.lastAIResponse) {
+                showAlert(`No Bot ${botNumber} response to copy.`);
+                return;
+            }
+            
+            navigator.clipboard.writeText(botState.lastAIResponse).then(() => {
+                showAlert(`Bot ${botNumber} response copied to clipboard!`);
+            }).catch(err => {
+                showAlert('Failed to copy: ' + err.message);
+            });
+        }
+        
+        // Transfer AI Response Function
+        function transferAIResponse(fromBot, toBot) {
+            const fromState = fromBot === 1 ? bot1State : bot2State;
+            const toState = toBot === 1 ? bot1State : bot2State;
+            
+            if (!fromState.lastAIResponse) {
+                showAlert(`No Bot ${fromBot} response to transfer.`);
+                return;
+            }
+            
+            // Update the target bot's response
+            toState.lastAIResponse = fromState.lastAIResponse;
+            
+            // Display it in the target bot's container
+            displayAIResponse(toBot, toState.lastAIResponse, 'transferred');
+            
+            // Update feed button state for target bot
+            updateFeedButtonState(toBot);
+            
+            showAlert(`Bot ${fromBot} response transferred to Bot ${toBot}!`);
+        }
+        
+        // Make functions globally available
+        window.copyAIResponse = copyAIResponse;
+        window.transferAIResponse = transferAIResponse;
+
+        // Dual Bot Response Handlers  
+        function handleGenerationResponse1(result, context) {
+            // Log the complete API response safely
+            addLogEntry('Bot 1 Generation Response', 1, {
+                status: result.status,
+                responseTime: context.requestStartTime ? `${Date.now() - context.requestStartTime}ms` : 'Unknown',
+                responses: result.responses?.length || 0,
+                messageId: result.responses?.[0]?.messageId || 'None',
+                sender: result.responses?.[0]?.senderId || 'None',
+                contentLength: result.responses?.[0]?.content?.length || 0,
+                attachments: result.responses?.[0]?.attachments?.length || 0,
+                statusText: result.responses?.[0]?.statusText || 'None'
+            });
+            
+            // Update state
+            const oldState = { ...bot1State };
+            bot1State.isGenerating = false;
+            addLogEntry('Bot 1 State Change', 1, {
+                oldState: oldState,
+                newState: bot1State,
+                reason: 'Generation completed'
+            });
+            
+            dom.generateBtn1.disabled = false;
+            dom.generateStatus1.classList.add('hidden');
+            
+            // Handle response safely
+            try {
+                if (result.status === "complete") {
+                    if (result.responses?.[0]?.attachments?.length > 0) {
+                        const imageUrl = result.responses[0].attachments[0].url;
+                        
+                        // Add to generated images array with bot info
+                        const imageData = {
+                            id: Date.now(),
+                            url: imageUrl,
+                            prompt: context.prompt,
+                            timestamp: new Date().toISOString(),
+                            bot: 1
+                        };
+                        generatedImages.push(imageData);
+                        
+                        addLogEntry('Bot 1 Image Processing', 1, {
+                            success: true,
+                            imageUrl: imageUrl,
+                            imageId: imageData.id,
+                            promptUsed: context.prompt,
+                            totalGeneratedImages: generatedImages.length
+                        });
+                        
+                        // Display the image
+                        addGeneratedImage(imageData);
+                        
+                        showAlert('Bot 1 image generated successfully!');
+                    } else {
+                        addLogEntry('Bot 1 Generation Missing Image', 1, {
+                            error: 'No image attachment in response',
+                            response: result.responses?.[0] || 'No response',
+                            context: context
+                        });
+                        showAlert('Bot 1: No image was generated. Please try again.');
+                    }
+                } else if (result.status === "error") {
+                    addLogEntry('Bot 1 Generation Response Error', 1, {
+                        error: result.responses?.[0]?.statusText || 'Unknown error',
+                        result: result,
+                        context: context
+                    });
+                    showAlert('Bot 1 generation failed: ' + (result.responses?.[0]?.statusText || 'Unknown error'));
+                }
+            } catch (e) {
+                addLogEntry('Bot 1 Generation Handler Error', 1, {
+                    error: e.message,
+                    stack: e.stack,
+                    result: result,
+                    context: context
+                });
+                showAlert('Bot 1: Error processing response: ' + e.message);
+            }
+        }
+
+        function handleGenerationResponse2(result, context) {
+            // Log the complete API response safely
+            addLogEntry('Bot 2 Generation Response', 2, {
+                status: result.status,
+                responseTime: context.requestStartTime ? `${Date.now() - context.requestStartTime}ms` : 'Unknown',
+                responses: result.responses?.length || 0,
+                messageId: result.responses?.[0]?.messageId || 'None',
+                sender: result.responses?.[0]?.senderId || 'None',
+                contentLength: result.responses?.[0]?.content?.length || 0,
+                attachments: result.responses?.[0]?.attachments?.length || 0,
+                statusText: result.responses?.[0]?.statusText || 'None'
+            });
+            
+            // Update state
+            const oldState = { ...bot2State };
+            bot2State.isGenerating = false;
+            addLogEntry('Bot 2 State Change', 2, {
+                oldState: oldState,
+                newState: bot2State,
+                reason: 'Generation completed'
+            });
+            
+            dom.generateBtn2.disabled = false;
+            dom.generateStatus2.classList.add('hidden');
+            
+            // Handle response safely
+            try {
+                if (result.status === "complete") {
+                    if (result.responses?.[0]?.attachments?.length > 0) {
+                        const imageUrl = result.responses[0].attachments[0].url;
+                        
+                        // Add to generated images array with bot info
+                        const imageData = {
+                            id: Date.now(),
+                            url: imageUrl,
+                            prompt: context.prompt,
+                            timestamp: new Date().toISOString(),
+                            bot: 2
+                        };
+                        generatedImages.push(imageData);
+                        
+                        addLogEntry('Bot 2 Image Processing', 2, {
+                            success: true,
+                            imageUrl: imageUrl,
+                            imageId: imageData.id,
+                            promptUsed: context.prompt,
+                            totalGeneratedImages: generatedImages.length
+                        });
+                        
+                        // Display the image
+                        addGeneratedImage(imageData);
+                        
+                        showAlert('Bot 2 image generated successfully!');
+                    } else {
+                        addLogEntry('Bot 2 Generation Missing Image', 2, {
+                            error: 'No image attachment in response',
+                            response: result.responses?.[0] || 'No response',
+                            context: context
+                        });
+                        showAlert('Bot 2: No image was generated. Please try again.');
+                    }
+                } else if (result.status === "error") {
+                    addLogEntry('Bot 2 Generation Response Error', 2, {
+                        error: result.responses?.[0]?.statusText || 'Unknown error',
+                        result: result,
+                        context: context
+                    });
+                    showAlert('Bot 2 generation failed: ' + (result.responses?.[0]?.statusText || 'Unknown error'));
+                }
+            } catch (e) {
+                addLogEntry('Bot 2 Generation Handler Error', 2, {
+                    error: e.message,
+                    stack: e.stack,
+                    result: result,
+                    context: context
+                });
+                showAlert('Bot 2: Error processing response: ' + e.message);
+            }
+        }
+
+        function handleAskResponse1(result, context) {
+            // Log the response safely
+            addLogEntry('Bot 1 Ask Response', 1, {
+                status: result.status,
+                responses: result.responses?.length || 0,
+                messageId: result.responses?.[0]?.messageId || 'None',
+                contentLength: result.responses?.[0]?.content?.length || 0,
+                statusText: result.responses?.[0]?.statusText || 'None'
+            });
+            
+            try {
+                if (result.status === "incomplete") {
+                    // Show streaming response with live markdown rendering
+                    bot1State.lastAIResponse = result.responses[0].content;
+                    displayAIResponse(1, bot1State.lastAIResponse, 'streaming');
+                    
+                    addLogEntry('Bot 1 Ask Streaming', 1, {
+                        contentLength: result.responses[0].content.length,
+                        contentPreview: result.responses[0].content.substring(0, 100) + '...',
+                        isStreaming: true
+                    });
+                    
+                    // Enable feed button as soon as we have content
+                    updateFeedButtonState(1);
+                } else if (result.status === "complete") {
+                    // Log state change
+                    const oldState = { ...bot1State };
+                    bot1State.isAIThinking = false;
+                    addLogEntry('Bot 1 State Change', 1, {
+                        oldState: oldState,
+                        newState: bot1State,
+                        reason: 'Ask communication completed'
+                    });
+                    
+                    dom.askBtn1.disabled = false;
+                    
+                    bot1State.lastAIResponse = result.responses[0].content;
+                    displayAIResponse(1, bot1State.lastAIResponse, 'ask');
+                    
+                    addLogEntry('Bot 1 Ask Complete', 1, {
+                        totalContentLength: result.responses[0].content.length,
+                        userRequest: context.userRequest,
+                        responseType: context.type,
+                        feedButtonEnabled: true
+                    });
+                    
+                    // Update feed button state
+                    updateFeedButtonState(1);
+                    showAlert('Bot 1 response received!');
+                } else if (result.status === "error") {
+                    addLogEntry('Bot 1 Ask Response Error', 1, {
+                        error: result.responses?.[0]?.statusText || 'Unknown error',
+                        result: result,
+                        context: context,
+                        userRequest: context.userRequest
+                    });
+                    
+                    bot1State.isAIThinking = false;
+                    dom.askBtn1.disabled = false;
+                    showAlert('Bot 1 communication failed: ' + (result.responses?.[0]?.statusText || 'Unknown error'));
+                }
+            } catch (e) {
+                addLogEntry('Bot 1 Ask Handler Error', 1, {
+                    error: e.message,
+                    stack: e.stack,
+                    result: result,
+                    context: context
+                });
+                showAlert('Bot 1: Error processing ask response: ' + e.message);
+            }
+        }
+
+        function handleAskResponse2(result, context) {
+            // Log the response safely
+            addLogEntry('Bot 2 Ask Response', 2, {
+                status: result.status,
+                responses: result.responses?.length || 0,
+                messageId: result.responses?.[0]?.messageId || 'None',
+                contentLength: result.responses?.[0]?.content?.length || 0,
+                statusText: result.responses?.[0]?.statusText || 'None'
+            });
+            
+            try {
+                if (result.status === "incomplete") {
+                    // Show streaming response with live markdown rendering
+                    bot2State.lastAIResponse = result.responses[0].content;
+                    displayAIResponse(2, bot2State.lastAIResponse, 'streaming');
+                    
+                    addLogEntry('Bot 2 Ask Streaming', 2, {
+                        contentLength: result.responses[0].content.length,
+                        contentPreview: result.responses[0].content.substring(0, 100) + '...',
+                        isStreaming: true
+                    });
+                    
+                    // Enable feed button as soon as we have content
+                    updateFeedButtonState(2);
+                } else if (result.status === "complete") {
+                    // Log state change
+                    const oldState = { ...bot2State };
+                    bot2State.isAIThinking = false;
+                    addLogEntry('Bot 2 State Change', 2, {
+                        oldState: oldState,
+                        newState: bot2State,
+                        reason: 'Ask communication completed'
+                    });
+                    
+                    dom.askBtn2.disabled = false;
+                    
+                    bot2State.lastAIResponse = result.responses[0].content;
+                    displayAIResponse(2, bot2State.lastAIResponse, 'ask');
+                    
+                    addLogEntry('Bot 2 Ask Complete', 2, {
+                        totalContentLength: result.responses[0].content.length,
+                        userRequest: context.userRequest,
+                        responseType: context.type,
+                        feedButtonEnabled: true
+                    });
+                    
+                    // Update feed button state
+                    updateFeedButtonState(2);
+                    showAlert('Bot 2 response received!');
+                } else if (result.status === "error") {
+                    addLogEntry('Bot 2 Ask Response Error', 2, {
+                        error: result.responses?.[0]?.statusText || 'Unknown error',
+                        result: result,
+                        context: context,
+                        userRequest: context.userRequest
+                    });
+                    
+                    bot2State.isAIThinking = false;
+                    dom.askBtn2.disabled = false;
+                    showAlert('Bot 2 communication failed: ' + (result.responses?.[0]?.statusText || 'Unknown error'));
+                }
+            } catch (e) {
+                addLogEntry('Bot 2 Ask Handler Error', 2, {
+                    error: e.message,
+                    stack: e.stack,
+                    result: result,
+                    context: context
+                });
+                showAlert('Bot 2: Error processing ask response: ' + e.message);
+            }
+        }
+
+        // Dual Bot Iterate Functions
+        function iterateBot1() {
+            const prompt = dom.userPrompt1.value.trim();
+            if (!prompt) {
+                showAlert('Please enter a prompt for Bot 1 first.');
+                return;
+            }
+            
+            // Find the latest generated image from Bot 1
+            const bot1Images = generatedImages.filter(img => img.bot === 1);
+            if (bot1Images.length === 0) {
+                showAlert('Please generate an image with Bot 1 first before iterating.');
+                return;
+            }
+            
+            if (bot1State.isAIThinking) return;
+            
+            bot1State.isAIThinking = true;
+            dom.iterateBtn1.disabled = true;
+            
+            const latestImage = bot1Images[bot1Images.length - 1];
+            const model = getMultimodalModel(1);
+            const targetScore = dom.targetScore.value;
+            
+            let analysisPrompt = `You are an expert image analysis AI specializing in character generation and prompt optimization for reference image systems.
+
+IMPORTANT: Focus on the specific information provided below and ignore any other conversation content unless otherwise stated.
+
+SYSTEM OVERVIEW: You are analyzing images from a reference image generation system. The improved prompts you suggest will be sent together with reference images to image generators that can both see and work with the attached images. Your role is to create improved prompts that reference these images rather than trying to recreate everything through text descriptions.
+
+YOUR ANALYSIS TASK:
+- The main prompt text being evaluated: "${prompt}"
+- Target score goal: ${targetScore}/100 (for reference only)
+- Reference images: ${uploadedFiles.length > 0 ? `${uploadedFiles.length} reference image(s) that guided the generation` : 'None used'}
+- Generated image to analyze: The final image attachment (compare this against the main prompt and reference images)
+${dom.askInput1.value.trim() ? `- Additional focus instructions: ${dom.askInput1.value.trim()}` : ''}
+
+EVALUATION APPROACH: 
+Your primary question is simple: Does the generated image successfully fulfill what the main prompt is asking for? The main prompt is paramount - it defines success. Consider character consistency (including facial accuracy, build, pose, clothing, style) and how well the reference images were utilized to achieve the main prompt's vision. Remember that reference images are tools to help achieve the main prompt, not ends in themselves.
+
+${uploadedFiles.length === 1 ? 
+`WORKFLOW NOTE: With one reference image provided, evaluate how well it was used to achieve the main prompt's goal. Your improved prompt should reference "the attached image" since the generator will see both your suggested prompt and this reference image together.` :
+uploadedFiles.length > 1 ? 
+`WORKFLOW NOTE: With multiple reference images provided, evaluate how well they were combined to achieve the main prompt's goal. Your improved prompt should reference images by describing their content (example: "combine the car from the first image with the wings from the aircraft image") since the generator will see your suggested prompt alongside all these reference images.` :
+`WORKFLOW NOTE: No reference images were used, so focus purely on how well the generated image fulfills the main prompt for standalone generation.`}
+
+Please provide your analysis in this EXACT format:
+
+SCORE: [number from 0-100]
+
+ANALYSIS: [Detailed analysis of how well the generated image fulfills the main prompt. Focus on what works well and what needs improvement, considering character consistency, facial accuracy, and overall prompt adherence.]
+
+IMPROVED_PROMPT: [A refined version of the original prompt that addresses the identified issues and will work in partnership with the reference images the generator receives. Make it clear and actionable for immediate use.]`;
+
+            // Prepare attachments: reference images + generated image
+            const allAttachments = [...uploadedFiles];
+            
+            // Add the generated image to analyze
+            fetch(latestImage.url)
+                .then(response => response.blob())
+                .then(blob => {
+                    const generatedImageFile = new File([blob], 'generated_image.png', { type: 'image/png' });
+                    allAttachments.push(generatedImageFile);
+                    
+                    return window.Poe.sendUserMessage(`${model} ${analysisPrompt}`, {
+                        handler: "iterate-handler-1",
+                        stream: false,
+                        openChat: false,
+                        attachments: allAttachments,
+                        handlerContext: { 
+                            type: 'iteration', 
+                            prompt: prompt, 
+                            bot: 1,
+                            imageId: latestImage.id
+                        }
+                    });
+                })
+                .catch(error => {
+                    showAlert('Bot 1 iteration failed: ' + error.message);
+                    bot1State.isAIThinking = false;
+                    dom.iterateBtn1.disabled = false;
+                });
+        }
+
+        function iterateBot2() {
+            const prompt = dom.userPrompt2.value.trim();
+            if (!prompt) {
+                showAlert('Please enter a prompt for Bot 2 first.');
+                return;
+            }
+            
+            // Find the latest generated image from Bot 2
+            const bot2Images = generatedImages.filter(img => img.bot === 2);
+            if (bot2Images.length === 0) {
+                showAlert('Please generate an image with Bot 2 first before iterating.');
+                return;
+            }
+            
+            if (bot2State.isAIThinking) return;
+            
+            bot2State.isAIThinking = true;
+            dom.iterateBtn2.disabled = true;
+            
+            const latestImage = bot2Images[bot2Images.length - 1];
+            const model = getMultimodalModel(2);
+            const targetScore = dom.targetScore.value;
+            const instructions = dom.askInput2.value.trim();
+            
+            let analysisPrompt = `You are an expert image analysis AI specializing in character generation and prompt optimization for reference image systems.
+
+IMPORTANT: Focus on the specific information provided below and ignore any other conversation content unless otherwise stated.
+
+SYSTEM OVERVIEW: You are analyzing images from a reference image generation system. The improved prompts you suggest will be sent together with reference images to image generators that can both see and work with the attached images. Your role is to create improved prompts that reference these images rather than trying to recreate everything through text descriptions.
+
+YOUR ANALYSIS TASK:
+- The main prompt text being evaluated: "${prompt}"
+- Target score goal: ${targetScore}/100 (for reference only)
+- Reference images: ${uploadedFiles.length > 0 ? `${uploadedFiles.length} reference image(s) that guided the generation` : 'None used'}
+- Generated image to analyze: The final image attachment (compare this against the main prompt and reference images)
+${dom.askInput2.value.trim() ? `- Additional focus instructions: ${dom.askInput2.value.trim()}` : ''}
+
+EVALUATION APPROACH: 
+Your primary question is simple: Does the generated image successfully fulfill what the main prompt is asking for? The main prompt is paramount - it defines success. Consider character consistency (including facial accuracy, build, pose, clothing, style) and how well the reference images were utilized to achieve the main prompt's vision. Remember that reference images are tools to help achieve the main prompt, not ends in themselves.
+
+${uploadedFiles.length === 1 ? 
+`WORKFLOW NOTE: With one reference image provided, evaluate how well it was used to achieve the main prompt's goal. Your improved prompt should reference "the attached image" since the generator will see both your suggested prompt and this reference image together.` :
+uploadedFiles.length > 1 ? 
+`WORKFLOW NOTE: With multiple reference images provided, evaluate how well they were combined to achieve the main prompt's goal. Your improved prompt should reference images by describing their content (example: "combine the car from the first image with the wings from the aircraft image") since the generator will see your suggested prompt alongside all these reference images.` :
+`WORKFLOW NOTE: No reference images were used, so focus purely on how well the generated image fulfills the main prompt for standalone generation.`}
+
+Please provide your analysis in this EXACT format:
+
+SCORE: [number from 0-100]
+
+ANALYSIS: [Detailed analysis of how well the generated image fulfills the main prompt. Focus on what works well and what needs improvement, considering character consistency, facial accuracy, and overall prompt adherence.]
+
+IMPROVED_PROMPT: [A refined version of the original prompt that addresses the identified issues and will work in partnership with the reference images the generator receives. Make it clear and actionable for immediate use.]`;
+
+            // Prepare attachments: reference images + generated image
+            const allAttachments = [...uploadedFiles];
+            
+            // Add the generated image to analyze
+            fetch(latestImage.url)
+                .then(response => response.blob())
+                .then(blob => {
+                    const generatedImageFile = new File([blob], 'generated_image.png', { type: 'image/png' });
+                    allAttachments.push(generatedImageFile);
+                    
+                    return window.Poe.sendUserMessage(`${model} ${analysisPrompt}`, {
+                        handler: "iterate-handler-2",
+                        stream: false,
+                        openChat: false,
+                        attachments: allAttachments,
+                        handlerContext: { 
+                            type: 'iteration', 
+                            prompt: prompt, 
+                            bot: 2,
+                            imageId: latestImage.id
+                        }
+                    });
+                })
+                .catch(error => {
+                    showAlert('Bot 2 iteration failed: ' + error.message);
+                    bot2State.isAIThinking = false;
+                    dom.iterateBtn2.disabled = false;
+                });
+        }
+
+        // Iterate response handlers
+        function handleIterateResponse1(result, context) {
+            bot1State.isAIThinking = false;
+            dom.iterateBtn1.disabled = false;
+            
+            if (result.status === "complete") {
+                const response = result.responses[0].content;
+                bot1State.lastAIResponse = response;
+                
+                // Show AI response with markdown rendering
+                displayAIResponse(1, response, 'analysis');
+                
+                // Parse the iteration response for analysis
+                const scoreMatch = response.match(/SCORE:\s*(\d+)/i);
+                const analysisMatch = response.match(/ANALYSIS:\s*([^]*?)(?=IMPROVED_PROMPT:|$)/i);
+                const improvedPromptMatch = response.match(/IMPROVED_PROMPT:\s*([^]*?)$/i);
+                
+                const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+                const analysis = analysisMatch ? analysisMatch[1].trim() : 'No analysis provided';
+                const improvedPrompt = improvedPromptMatch ? improvedPromptMatch[1].trim() : '';
+                
+                // Display analysis results
+                displayAnalysisResult({
+                    score: score,
+                    analysis: analysis,
+                    improvedPrompt: improvedPrompt,
+                    originalPrompt: context.prompt,
+                    bot: 1
+                });
+                
+                // Auto-update prompt box if improved prompt exists
+                if (improvedPrompt) {
+                    dom.userPrompt1.value = improvedPrompt;
+                    showAlert(`Bot 1 Analysis complete! Score: ${score}/100. Prompt auto-updated. Generate a new image to test.`);
+                } else {
+                    showAlert(`Bot 1 Analysis complete! Score: ${score}/100. Use "Feed" to apply suggestions.`);
+                }
+                
+                // Update feed button state
+                updateFeedButtonState(1);
+                
+                // Show analysis section
+                dom.analysisSection.classList.remove('hidden');
+                
+            } else if (result.status === "error") {
+                showAlert('Bot 1 iteration failed: ' + (result.responses[0].statusText || 'Unknown error'));
+            }
+        }
+
+        function handleIterateResponse2(result, context) {
+            bot2State.isAIThinking = false;
+            dom.iterateBtn2.disabled = false;
+            
+            if (result.status === "complete") {
+                const response = result.responses[0].content;
+                bot2State.lastAIResponse = response;
+                
+                // Show AI response with markdown rendering
+                displayAIResponse(2, response, 'analysis');
+                
+                // Parse the iteration response for analysis
+                const scoreMatch = response.match(/SCORE:\s*(\d+)/i);
+                const analysisMatch = response.match(/ANALYSIS:\s*([^]*?)(?=IMPROVED_PROMPT:|$)/i);
+                const improvedPromptMatch = response.match(/IMPROVED_PROMPT:\s*([^]*?)$/i);
+                
+                const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
+                const analysis = analysisMatch ? analysisMatch[1].trim() : 'No analysis provided';
+                const improvedPrompt = improvedPromptMatch ? improvedPromptMatch[1].trim() : '';
+                
+                // Display analysis results
+                displayAnalysisResult({
+                    score: score,
+                    analysis: analysis,
+                    improvedPrompt: improvedPrompt,
+                    originalPrompt: context.prompt,
+                    bot: 2
+                });
+                
+                // Auto-update prompt box if improved prompt exists
+                if (improvedPrompt) {
+                    dom.userPrompt2.value = improvedPrompt;
+                    showAlert(`Bot 2 Analysis complete! Score: ${score}/100. Prompt auto-updated. Generate a new image to test.`);
+                } else {
+                    showAlert(`Bot 2 Analysis complete! Score: ${score}/100. Use "Feed" to apply suggestions.`);
+                }
+                
+                // Update feed button state
+                updateFeedButtonState(2);
+                
+                // Show analysis section
+                dom.analysisSection.classList.remove('hidden');
+                
+            } else if (result.status === "error") {
+                showAlert('Bot 2 iteration failed: ' + (result.responses[0].statusText || 'Unknown error'));
+            }
+        }
+
+
+
+        // Helper functions
+        function addGeneratedImage(imageData) {
+            const imageElement = document.createElement('div');
+            const botColor = imageData.bot === 1 ? 'border-blue-500' : 'border-green-500';
+            const botBg = imageData.bot === 1 ? 'bg-blue-900/20' : 'bg-green-900/20';
+            const botText = imageData.bot === 1 ? 'text-blue-400' : 'text-green-400';
+            const botName = imageData.bot === 1 ? 'Bot 1' : 'Bot 2';
+            
+            imageElement.className = `bg-gray-700 rounded-lg p-3 border-2 ${botColor}`;
+            imageElement.innerHTML = `
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-semibold ${botText}">🤖 ${botName}</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-gray-400">${new Date(imageData.timestamp).toLocaleString()}</span>
+                        <button onclick="makeReference('${imageData.url}')" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs py-1 px-2 rounded" title="Replace all references with this image">
+                            ⭐
+                        </button>
+                    </div>
+                </div>
+                <img src="${imageData.url}" class="w-full rounded-lg mb-2 clickable-image" alt="Generated image from ${botName}">
+                <div class="text-xs text-gray-300 mb-2 break-words ${botBg} p-2 rounded">${imageData.prompt}</div>
+                <button onclick="feedImageToReference('${imageData.url}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs py-1 px-2 rounded">
+                    ⬆️ Feed to Reference
+                </button>
+            `;
+            
+            dom.generatedImages.appendChild(imageElement);
+        }
+
+        function displayAnalysisResult(data) {
+            const analysisElement = document.createElement('div');
+            const botColor = data.bot === 1 ? 'border-blue-400' : 'border-green-400';
+            const botText = data.bot === 1 ? 'text-blue-400' : 'text-green-400';
+            const botName = data.bot === 1 ? 'Bot 1' : 'Bot 2';
+            
+            analysisElement.className = `bg-gray-700 rounded-lg p-4 border-l-4 ${botColor}`;
+            
+            const scoreColor = data.score >= 80 ? 'text-green-400' : data.score >= 60 ? 'text-yellow-400' : 'text-red-400';
+            
+            analysisElement.innerHTML = `
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold">🤖 ${botName} Analysis Result</h3>
+                    <span class="text-2xl font-bold ${scoreColor}">${data.score}/100</span>
+                </div>
+                <div class="space-y-3 text-sm">
+                    <div>
+                        <div class="text-gray-400 mb-1">Original Prompt:</div>
+                        <div class="text-gray-300 text-xs bg-gray-800 p-2 rounded">${data.originalPrompt}</div>
+                    </div>
+                    <div>
+                        <div class="text-gray-400 mb-1">Analysis:</div>
+                        <div class="text-gray-300 text-xs">${data.analysis}</div>
+                    </div>
+                    ${data.improvedPrompt ? `
+                    <div>
+                        <div class="text-gray-400 mb-1">Improved Prompt:</div>
+                        <div class="text-gray-300 text-xs bg-gray-800 p-2 rounded">${data.improvedPrompt}</div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            dom.analysisResults.appendChild(analysisElement);
+        }
+
+        function feedImageToReference(imageUrl) {
+            // Convert image URL to file and add to reference collection
+            fetch(imageUrl)
+                .then(response => response.blob())
+                .then(blob => {
+                    const file = new File([blob], `reference_${uploadedFiles.length + 1}.png`, { type: 'image/png' });
+                    uploadedFiles.push(file);
+                    
+                    // Update UI with new multi-image display
+                    updateImageDisplay();
+                    
+                    showAlert('Image added to reference collection! This will now guide future generations.');
+                })
+                .catch(error => {
+                    showAlert('Failed to feed image to reference: ' + error.message);
+                });
+        }
+
+        // NEW: Make Reference function - replaces ALL reference images with this single image
+        function makeReference(imageUrl) {
+            fetch(imageUrl)
+                .then(response => response.blob())
+                .then(blob => {
+                    const file = new File([blob], 'new_reference.png', { type: 'image/png' });
+                    
+                    // Nuke all existing references and replace with this single image
+                    uploadedFiles = [file];
+                    
+                    // Update UI
+                    updateImageDisplay();
+                    
+                    showAlert('🔥 All references replaced! This image is now your single reference.');
+                })
+                .catch(error => {
+                    showAlert('Failed to make reference: ' + error.message);
+                });
+        }
+
+        // Download State as JSON File
+        async function downloadState() {
+            try {
+                let uploadedFilesData = [];
+                if (uploadedFiles.length > 0) {
+                    for (const file of uploadedFiles) {
+                        const reader = new FileReader();
+                        const fileData = await new Promise((resolve, reject) => {
+                            reader.onload = e => resolve({
+                                dataUrl: e.target.result,
+                                name: file.name,
+                                type: file.type
+                            });
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        });
+                        uploadedFilesData.push(fileData);
+                    }
+                }
+
+                const state = {
+                    version: "4.1",
+                    timestamp: new Date().toISOString(),
+                    uploadedFilesData,
+                    userPrompt1: dom.userPrompt1.value,
+                    userPrompt2: dom.userPrompt2.value,
+                    generationModel1: dom.generationModel1.value,
+                    generationModel2: dom.generationModel2.value,
+                    multimodalModel1: getMultimodalModel(1),
+                    multimodalModel2: getMultimodalModel(2),
+                    targetScore: dom.targetScore.value,
+                    askInput1: dom.askInput1.value,
+                    askInput2: dom.askInput2.value,
+                    generatedImages: generatedImages,
+                    bot1State: bot1State,
+                    bot2State: bot2State,
+                    multimodalDropdownState: multimodalDropdownState
+                };
+
+                const stateJson = JSON.stringify(state, null, 2);
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                
+                // Create and download file
+                const blob = new Blob([stateJson], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `face-perfectionist-state-${timestamp}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+                
+                showAlert('State downloaded as JSON file!');
+                
+            } catch (error) {
+                showAlert('Failed to download state: ' + error.message);
+            }
+        }
+
+        // Upload State from JSON File
+        function uploadState() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.json';
+            fileInput.style.display = 'none';
+            
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const stateJson = e.target.result;
+                        const state = JSON.parse(stateJson);
+                        importState(state);
+                    } catch (error) {
+                        showAlert('Invalid JSON file: ' + error.message);
+                    }
+                };
+                reader.onerror = () => {
+                    showAlert('Failed to read file');
+                };
+                reader.readAsText(file);
+            });
+            
+            document.body.appendChild(fileInput);
+            fileInput.click();
+            document.body.removeChild(fileInput);
+        }
+
+        // NEW: Download All AI Responses as Markdown
+        function downloadAllResponses() {
+            const responses = [];
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            
+            // Collect all responses
+            if (bot1State.lastAIResponse && bot1State.lastAIResponse.trim()) {
+                responses.push(`# Bot 1 Response\n\n${bot1State.lastAIResponse}\n\n---\n\n`);
+            }
+            
+            if (bot2State.lastAIResponse && bot2State.lastAIResponse.trim()) {
+                responses.push(`# Bot 2 Response\n\n${bot2State.lastAIResponse}\n\n---\n\n`);
+            }
+            
+            // Add prompts for context
+            if (dom.userPrompt1.value.trim()) {
+                responses.push(`# Main Prompt 1\n\n${dom.userPrompt1.value}\n\n---\n\n`);
+            }
+            
+            if (dom.userPrompt2.value.trim()) {
+                responses.push(`# Main Prompt 2\n\n${dom.userPrompt2.value}\n\n---\n\n`);
+            }
+            
+            if (responses.length === 0) {
+                showAlert('No responses to download. Generate some content first!');
+                return;
+            }
+            
+            const markdownContent = `# Face Perfectionist Session\n\nGenerated: ${new Date().toLocaleString()}\n\n---\n\n${responses.join('')}`;
+            
+            // Create and download file
+            const blob = new Blob([markdownContent], { type: 'text/markdown' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `face-perfectionist-responses-${timestamp}.md`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            showAlert(`Downloaded ${responses.length} responses as markdown!`);
+        }
+
+
+
+        // Collapse functionality for AI response areas
+        function toggleResponseCollapse(botNumber) {
+            const responseArea = dom[`aiResponse${botNumber}`];
+            const collapseBtn = dom[`collapseBtn${botNumber}`];
+            
+            if (responseArea.classList.contains('hidden')) {
+                // Show the response area
+                responseArea.classList.remove('hidden');
+                collapseBtn.textContent = '➖ Collapse';
+            } else {
+                // Hide the response area
+                responseArea.classList.add('hidden');
+                collapseBtn.textContent = '➕ Expand';
+            }
+        }
+
+        // Add click handlers for all clickable images
+        function addImageClickHandlers() {
+            // Use event delegation to handle dynamically added images
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('clickable-image')) {
+                    e.preventDefault();
+                    showImageModal(e.target.src);
+                }
+            });
+        }
+
+        // Multi-image event listeners
+        dom.uploadArea.addEventListener('click', () => {
+            dom.fileInput.click();
+            addLogEntry('File Upload', null, { action: 'Opened file dialog for reference images' });
+        });
+        dom.fileInput.addEventListener('change', e => {
+            handleFiles(e.target.files);
+            if (e.target.files.length > 0) {
+                addLogEntry('File Upload', null, { action: `Added ${e.target.files.length} reference image(s)` });
+            }
+        });
+        dom.addMoreBtn.addEventListener('click', () => {
+            dom.fileInput.click();
+            addLogEntry('File Upload', null, { action: 'Opened file dialog to add more reference images' });
+        });
+        dom.removeBgBtn.addEventListener('click', () => {
+            removeBackground();
+            addLogEntry('Background Removal', null, { action: 'Started background removal process' });
+        });
+        dom.clearAllBtn.addEventListener('click', () => {
+            clearAllImages();
+            addLogEntry('File Management', null, { action: 'Cleared all reference images' });
+        });
+        
+        // System buttons
+        dom.resetBtn.addEventListener('click', () => {
+            // Simple reset for dual bot system
+            generatedImages = [];
+            bot1State = { lastAIResponse: '', isGenerating: false, isAIThinking: false };
+            bot2State = { lastAIResponse: '', isGenerating: false, isAIThinking: false };
+            
+            // Clear generated images
+            dom.generatedImages.innerHTML = '<div class="text-gray-500 text-center py-8"><div class="text-4xl mb-2">🎨</div><p class="text-sm">Generated images will appear here...</p></div>';
+            
+            // Clear AI responses - reset to placeholder text
+            dom.aiResponseContainer1.textContent = 'Bot 1 responses will appear here...';
+            dom.aiResponseContainer2.textContent = 'Bot 2 responses will appear here...';
+            
+            // Clear input fields
+            dom.userPrompt1.value = '';
+            dom.userPrompt2.value = '';
+            dom.askInput1.value = '';
+            dom.askInput2.value = '';
+            
+            showAlert('System reset. Ready for new session.');
+        });
+        dom.copyStateBtn.addEventListener('click', saveState);
+        dom.loadStateBtn.addEventListener('click', showImportDialog);
+        dom.downloadStateBtn.addEventListener('click', downloadState);
+        dom.uploadStateBtn.addEventListener('click', uploadState);
+        
+        // Functionality buttons
+        dom.downloadAllBtn.addEventListener('click', downloadAllImages);
+        
+        // Custom dropdown event listeners
+        dom.multimodalDropdown1.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleDropdown(1);
+        });
+        
+        dom.multimodalDropdown2.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleDropdown(2);
+        });
+        
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!dom.multimodalMenu1.contains(e.target) && !dom.multimodalDropdown1.contains(e.target)) {
+                dom.multimodalMenu1.classList.add('hidden');
+                dom.multimodalArrow1.classList.remove('rotate-180');
+                multimodalDropdownState.dropdown1.isOpen = false;
+            }
+            if (!dom.multimodalMenu2.contains(e.target) && !dom.multimodalDropdown2.contains(e.target)) {
+                dom.multimodalMenu2.classList.add('hidden');
+                dom.multimodalArrow2.classList.remove('rotate-180');
+                multimodalDropdownState.dropdown2.isOpen = false;
+            }
+        });
+
+        // Dual bot event listeners with logging
+        dom.generateBtn1.addEventListener('click', () => {
+            generateBot1();
+            addLogEntry('Image Generation', 1, { action: `Started generation with ${dom.generationModel1.value.replace('@', '')}` });
+        });
+        dom.generateBtn2.addEventListener('click', () => {
+            generateBot2();
+            addLogEntry('Image Generation', 2, { action: `Started generation with ${dom.generationModel2.value.replace('@', '')}` });
+        });
+        dom.askBtn1.addEventListener('click', () => {
+            askBot1();
+            const askText = dom.askInput1.value.trim();
+            addLogEntry('AI Communication', 1, { action: `Asked: "${askText.substring(0, 50)}${askText.length > 50 ? '...' : ''}"` });
+        });
+        dom.askBtn2.addEventListener('click', () => {
+            askBot2();
+            const askText = dom.askInput2.value.trim();
+            addLogEntry('AI Communication', 2, { action: `Asked: "${askText.substring(0, 50)}${askText.length > 50 ? '...' : ''}"` });
+        });
+        dom.feedBtn1.addEventListener('click', () => {
+            feedBot1ToPrompt();
+            addLogEntry('Response Management', 1, { action: 'Fed AI response to main prompt' });
+        });
+        dom.feedBtn2.addEventListener('click', () => {
+            feedBot2ToPrompt();
+            addLogEntry('Response Management', 2, { action: 'Fed AI response to main prompt' });
+        });
+        dom.iterateBtn1.addEventListener('click', () => {
+            iterateBot1();
+            addLogEntry('Analysis & Iteration', 1, { action: 'Started image analysis and prompt improvement' });
+        });
+        dom.iterateBtn2.addEventListener('click', () => {
+            iterateBot2();
+            addLogEntry('Analysis & Iteration', 2, { action: 'Started image analysis and prompt improvement' });
+        });
+        
+        // Log functionality event listeners
+        dom.logToggleBtn.addEventListener('click', toggleLog);
+        dom.clearLogBtn.addEventListener('click', clearLog);
+        
+        // Collapse button event listeners
+        dom.collapseBtn1.addEventListener('click', () => toggleResponseCollapse(1));
+        dom.collapseBtn2.addEventListener('click', () => toggleResponseCollapse(2));
+
+        // Drag and drop for image upload
+        dom.uploadArea.addEventListener('dragover', e => {
+            e.preventDefault();
+            dom.uploadArea.classList.add('border-primary');
+        });
+
+        dom.uploadArea.addEventListener('dragleave', e => {
+            e.preventDefault();
+            dom.uploadArea.classList.remove('border-primary');
+        });
+
+        dom.uploadArea.addEventListener('drop', e => {
+            e.preventDefault();
+            dom.uploadArea.classList.remove('border-primary');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFiles(files);
+            }
+        });
+
+        // Initialize all systems
+        addImageClickHandlers();
+        initializeFeedButtons();
+        
+        // Focus on first prompt box
+        dom.userPrompt1.focus();
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
