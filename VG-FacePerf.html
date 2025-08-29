@@ -513,7 +513,22 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import {
+            showAlert,
+            copyTextToClipboard,
+            transferText,
+            downloadAllImages,
+            saveState,
+            showImportDialog,
+            downloadState,
+            uploadState,
+            downloadAllResponses
+        } from "./lib/utils.js";
+
+        window.copyTextToClipboard = copyTextToClipboard;
+        window.transferText = transferText;
+
         // Global state - Updated for dual bot system
         let uploadedFiles = []; // Changed to array for multi-image support
         let generatedImages = [];
@@ -732,6 +747,13 @@
             finalImage: document.getElementById('finalImage'),
             iterationHistory: document.getElementById('iterationHistory')
         };
+
+        window.downloadAllResponses = () => downloadAllResponses(
+            bot1State.lastAIResponse,
+            bot2State.lastAIResponse,
+            dom.userPrompt1.value,
+            dom.userPrompt2.value
+        );
 
         // Poe handlers - Updated for dual bot system
         window.Poe.registerHandler("generation-handler-1", handleGenerationResponse1);
@@ -1074,64 +1096,9 @@
             
             document.body.appendChild(modal);
         }
-
-        function showAlert(message) {
-            const toast = document.createElement('div');
-            toast.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 max-w-sm';
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.remove();
-            }, 4000);
-        }
-
         // Global function for feeding images to reference (called from HTML)
         window.feedImageToReference = feedImageToReference;
         
-        // Copy and transfer functions (called from HTML)
-        function copyTextToClipboard(elementId) {
-            const element = document.getElementById(elementId);
-            const text = element.value || element.textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                showAlert('Text copied to clipboard!');
-            }).catch(err => {
-                showAlert('Failed to copy: ' + err.message);
-            });
-        }
-        
-        function transferText(fromId, toId) {
-            const fromElement = document.getElementById(fromId);
-            const toElement = document.getElementById(toId);
-            const text = fromElement.value || fromElement.textContent;
-            
-            if (toElement.tagName === 'TEXTAREA' || toElement.tagName === 'INPUT') {
-                toElement.value = text;
-            } else {
-                toElement.textContent = text;
-            }
-            
-            showAlert(`Text transferred from ${fromId} to ${toId}!`);
-        }
-        
-        // Make functions globally available
-        window.copyTextToClipboard = copyTextToClipboard;
-        window.transferText = transferText;
-        window.makeReference = makeReference;
-
-        // Copy prompt functions
-        function copyToPrompt1() {
-            const prompt2Text = dom.userPrompt2.value;
-            dom.userPrompt1.value = prompt2Text;
-            showAlert('Prompt 2 copied to Prompt 1!');
-        }
-
-        function copyToPrompt2() {
-            const prompt1Text = dom.userPrompt1.value;
-            dom.userPrompt2.value = prompt1Text;
-            showAlert('Prompt 1 copied to Prompt 2!');
-        }
-
         // Dual Bot Generation Functions
         function generateBot1() {
             // Get fresh reference to ensure we have the latest value
@@ -1562,200 +1529,42 @@ Please respond to the user's request with helpful, detailed guidance. When sugge
             dom.feedBtn2.disabled = true;
         }
 
-        // Download all images functionality
-        async function downloadAllImages() {
-            if (generatedImages.length === 0) {
-                showAlert('No images to download.');
-                return;
-            }
-
-            showAlert(`Downloading ${generatedImages.length} images...`);
-
-            for (let i = 0; i < generatedImages.length; i++) {
-                try {
-                    const imageData = generatedImages[i];
-                    const response = await fetch(imageData.url);
-                    const blob = await response.blob();
-                    
-                    const url = window.URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `generated_image_${i + 1}_${imageData.id}.png`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                    
-                    // Small delay between downloads to avoid overwhelming the browser
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                } catch (error) {
-                    console.error(`Failed to download image ${i + 1}:`, error);
-                }
-            }
-
-            showAlert('All images downloaded successfully!');
-        }
-
-        // Save/Import State Functions (updated for dual bot structure)
-        async function saveState() {
-            try {
-                let uploadedFilesData = [];
-                if (uploadedFiles.length > 0) {
-                    for (const file of uploadedFiles) {
-                        const reader = new FileReader();
-                        const fileData = await new Promise((resolve, reject) => {
-                            reader.onload = e => resolve({
-                                dataUrl: e.target.result,
-                                name: file.name,
-                                type: file.type
-                            });
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
+        async function buildState() {
+            let uploadedFilesData = [];
+            if (uploadedFiles.length > 0) {
+                for (const file of uploadedFiles) {
+                    const reader = new FileReader();
+                    const fileData = await new Promise((resolve, reject) => {
+                        reader.onload = e => resolve({
+                            dataUrl: e.target.result,
+                            name: file.name,
+                            type: file.type
                         });
-                        uploadedFilesData.push(fileData);
-                    }
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                    uploadedFilesData.push(fileData);
                 }
-
-                const state = {
-                    version: "4.1",
-                    timestamp: new Date().toISOString(),
-                    uploadedFilesData,
-                    userPrompt1: dom.userPrompt1.value,
-                    userPrompt2: dom.userPrompt2.value,
-                    generationModel1: dom.generationModel1.value,
-                    generationModel2: dom.generationModel2.value,
-                    multimodalModel1: getMultimodalModel(1),
-                    multimodalModel2: getMultimodalModel(2),
-                    targetScore: dom.targetScore.value,
-                    askInput1: dom.askInput1.value,
-                    askInput2: dom.askInput2.value,
-                    generatedImages: generatedImages,
-                    bot1State: bot1State,
-                    bot2State: bot2State,
-                    multimodalDropdownState: multimodalDropdownState
-                };
-
-                const stateJson = JSON.stringify(state, null, 2);
-                
-                // Try modern clipboard API first, then fallback to older method
-                try {
-                    await navigator.clipboard.writeText(stateJson);
-                    showAlert('State saved to clipboard! Use "Import State" to restore later.');
-                } catch (clipboardError) {
-                    // Fallback method for clipboard
-                    const textArea = document.createElement('textarea');
-                    textArea.value = stateJson;
-                    textArea.style.position = 'fixed';
-                    textArea.style.left = '-999999px';
-                    textArea.style.top = '-999999px';
-                    document.body.appendChild(textArea);
-                    textArea.focus();
-                    textArea.select();
-                    
-                    try {
-                        const successful = document.execCommand('copy');
-                        if (successful) {
-                            showAlert('State saved to clipboard! Use "Import State" to restore later.');
-                        } else {
-                            throw new Error('Copy command failed');
-                        }
-                    } catch (execError) {
-                        // Final fallback - show in a modal
-                        showStateCopyModal(stateJson);
-                    } finally {
-                        document.body.removeChild(textArea);
-                    }
-                }
-                
-            } catch (error) {
-                showAlert('Failed to save state: ' + error.message);
             }
+            return {
+                version: "4.1",
+                timestamp: new Date().toISOString(),
+                uploadedFilesData,
+                userPrompt1: dom.userPrompt1.value,
+                userPrompt2: dom.userPrompt2.value,
+                generationModel1: dom.generationModel1.value,
+                generationModel2: dom.generationModel2.value,
+                multimodalModel1: getMultimodalModel(1),
+                multimodalModel2: getMultimodalModel(2),
+                targetScore: dom.targetScore.value,
+                askInput1: dom.askInput1.value,
+                askInput2: dom.askInput2.value,
+                generatedImages: generatedImages,
+                bot1State: bot1State,
+                bot2State: bot2State,
+                multimodalDropdownState: multimodalDropdownState
+            };
         }
-        
-        function showStateCopyModal(stateJson) {
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-            modal.innerHTML = `
-                <div class="bg-gray-800 p-6 rounded-lg shadow-lg max-w-4xl w-full mx-4 max-h-96">
-                    <h3 class="text-lg font-semibold text-white mb-4">Copy State Manually</h3>
-                    <p class="text-gray-300 mb-3">Automatic clipboard copy failed. Please manually copy the text below:</p>
-                    <textarea readonly class="w-full h-48 p-3 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm resize-none font-mono" id="manualCopyText">${stateJson}</textarea>
-                    <div class="flex justify-end space-x-3 mt-4">
-                        <button id="selectAllBtn" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded">Select All</button>
-                        <button id="closeModal" class="px-4 py-2 text-gray-400 hover:bg-gray-700 rounded">Close</button>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-            
-            const textarea = modal.querySelector('#manualCopyText');
-            const selectAllBtn = modal.querySelector('#selectAllBtn');
-            const closeBtn = modal.querySelector('#closeModal');
-            
-            selectAllBtn.addEventListener('click', () => {
-                textarea.focus();
-                textarea.select();
-            });
-            
-            const closeModal = () => modal.remove();
-            closeBtn.addEventListener('click', closeModal);
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) closeModal();
-            });
-            
-            // Auto-select the text
-            setTimeout(() => {
-                textarea.focus();
-                textarea.select();
-            }, 100);
-        }
-
-        function showImportDialog() {
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-            modal.innerHTML = `
-                <div class="bg-gray-800 p-6 rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-96">
-                    <h3 class="text-lg font-semibold text-white mb-4">Import State</h3>
-                    <textarea id="importTextarea" class="w-full h-48 p-3 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm resize-none font-mono" placeholder="Paste your saved state JSON here..."></textarea>
-                    <div class="flex justify-end space-x-3 mt-4">
-                        <button id="cancelImport" class="px-4 py-2 text-gray-400 hover:bg-gray-700 rounded">Cancel</button>
-                        <button id="confirmImport" class="px-4 py-2 bg-primary text-white hover:bg-purple-700 rounded">Import</button>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-            
-            const textarea = modal.querySelector('#importTextarea');
-            const cancelBtn = modal.querySelector('#cancelImport');
-            const confirmBtn = modal.querySelector('#confirmImport');
-            
-            textarea.focus();
-            
-            const closeModal = () => modal.remove();
-            cancelBtn.addEventListener('click', closeModal);
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) closeModal();
-            });
-            
-            confirmBtn.addEventListener('click', () => {
-                try {
-                    const stateJson = textarea.value.trim();
-                    if (!stateJson) {
-                        showAlert('Please paste a valid state JSON.');
-                        return;
-                    }
-                    
-                    const state = JSON.parse(stateJson);
-                    importState(state);
-                    closeModal();
-                } catch (error) {
-                    showAlert('Invalid JSON format: ' + error.message);
-                }
-            });
-        }
-
         async function importState(state) {
             try {
                 // Restore uploaded files (multi-image support)
@@ -2580,144 +2389,7 @@ IMPROVED_PROMPT: [A refined version of the original prompt that addresses the id
                     showAlert('Failed to make reference: ' + error.message);
                 });
         }
-
-        // Download State as JSON File
-        async function downloadState() {
-            try {
-                let uploadedFilesData = [];
-                if (uploadedFiles.length > 0) {
-                    for (const file of uploadedFiles) {
-                        const reader = new FileReader();
-                        const fileData = await new Promise((resolve, reject) => {
-                            reader.onload = e => resolve({
-                                dataUrl: e.target.result,
-                                name: file.name,
-                                type: file.type
-                            });
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
-                        });
-                        uploadedFilesData.push(fileData);
-                    }
-                }
-
-                const state = {
-                    version: "4.1",
-                    timestamp: new Date().toISOString(),
-                    uploadedFilesData,
-                    userPrompt1: dom.userPrompt1.value,
-                    userPrompt2: dom.userPrompt2.value,
-                    generationModel1: dom.generationModel1.value,
-                    generationModel2: dom.generationModel2.value,
-                    multimodalModel1: getMultimodalModel(1),
-                    multimodalModel2: getMultimodalModel(2),
-                    targetScore: dom.targetScore.value,
-                    askInput1: dom.askInput1.value,
-                    askInput2: dom.askInput2.value,
-                    generatedImages: generatedImages,
-                    bot1State: bot1State,
-                    bot2State: bot2State,
-                    multimodalDropdownState: multimodalDropdownState
-                };
-
-                const stateJson = JSON.stringify(state, null, 2);
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                
-                // Create and download file
-                const blob = new Blob([stateJson], { type: 'application/json' });
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `face-perfectionist-state-${timestamp}.json`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-                
-                showAlert('State downloaded as JSON file!');
-                
-            } catch (error) {
-                showAlert('Failed to download state: ' + error.message);
-            }
-        }
-
-        // Upload State from JSON File
-        function uploadState() {
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = '.json';
-            fileInput.style.display = 'none';
-            
-            fileInput.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const stateJson = e.target.result;
-                        const state = JSON.parse(stateJson);
-                        importState(state);
-                    } catch (error) {
-                        showAlert('Invalid JSON file: ' + error.message);
-                    }
-                };
-                reader.onerror = () => {
-                    showAlert('Failed to read file');
-                };
-                reader.readAsText(file);
-            });
-            
-            document.body.appendChild(fileInput);
-            fileInput.click();
-            document.body.removeChild(fileInput);
-        }
-
-        // NEW: Download All AI Responses as Markdown
-        function downloadAllResponses() {
-            const responses = [];
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            
-            // Collect all responses
-            if (bot1State.lastAIResponse && bot1State.lastAIResponse.trim()) {
-                responses.push(`# Bot 1 Response\n\n${bot1State.lastAIResponse}\n\n---\n\n`);
-            }
-            
-            if (bot2State.lastAIResponse && bot2State.lastAIResponse.trim()) {
-                responses.push(`# Bot 2 Response\n\n${bot2State.lastAIResponse}\n\n---\n\n`);
-            }
-            
-            // Add prompts for context
-            if (dom.userPrompt1.value.trim()) {
-                responses.push(`# Main Prompt 1\n\n${dom.userPrompt1.value}\n\n---\n\n`);
-            }
-            
-            if (dom.userPrompt2.value.trim()) {
-                responses.push(`# Main Prompt 2\n\n${dom.userPrompt2.value}\n\n---\n\n`);
-            }
-            
-            if (responses.length === 0) {
-                showAlert('No responses to download. Generate some content first!');
-                return;
-            }
-            
-            const markdownContent = `# Face Perfectionist Session\n\nGenerated: ${new Date().toLocaleString()}\n\n---\n\n${responses.join('')}`;
-            
-            // Create and download file
-            const blob = new Blob([markdownContent], { type: 'text/markdown' });
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `face-perfectionist-responses-${timestamp}.md`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-            
-            showAlert(`Downloaded ${responses.length} responses as markdown!`);
-        }
-
-
+        window.makeReference = makeReference;
 
         // Collapse functionality for AI response areas
         function toggleResponseCollapse(botNumber) {
@@ -2792,13 +2464,13 @@ IMPROVED_PROMPT: [A refined version of the original prompt that addresses the id
             
             showAlert('System reset. Ready for new session.');
         });
-        dom.copyStateBtn.addEventListener('click', saveState);
-        dom.loadStateBtn.addEventListener('click', showImportDialog);
-        dom.downloadStateBtn.addEventListener('click', downloadState);
-        dom.uploadStateBtn.addEventListener('click', uploadState);
+        dom.copyStateBtn.addEventListener('click', async () => { const state = await buildState(); saveState(state); });
+        dom.loadStateBtn.addEventListener('click', () => showImportDialog(importState));
+        dom.downloadStateBtn.addEventListener('click', async () => { const state = await buildState(); downloadState(state); });
+        dom.uploadStateBtn.addEventListener('click', () => uploadState(importState));
         
         // Functionality buttons
-        dom.downloadAllBtn.addEventListener('click', downloadAllImages);
+        dom.downloadAllBtn.addEventListener('click', () => downloadAllImages(generatedImages));
         
         // Custom dropdown event listeners
         dom.multimodalDropdown1.addEventListener('click', (e) => {
