@@ -6,7 +6,7 @@
     <title>Face Perfectionist - Iterative AI Refinement</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script>
+    <script type="module">
         tailwind.config = {
             theme: {
                 extend: {
@@ -513,7 +513,9 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { addLogEntry } from './components/log.js';
+
         // Global state - Updated for dual bot system
         let uploadedFiles = []; // Changed to array for multi-image support
         let generatedImages = [];
@@ -527,120 +529,6 @@
             isGenerating: false,
             isAIThinking: false
         };
-        
-        // Simple, bulletproof logging system
-        let logEntries = [];
-        
-        // Simple log function that never fails
-        function addLogEntry(action, botNumber, data = {}) {
-            try {
-                const timestamp = new Date().toLocaleString();
-                const entry = {
-                    id: Date.now() + Math.random(),
-                    timestamp,
-                    action,
-                    bot: botNumber,
-                    data: data
-                };
-                
-                logEntries.push(entry);
-                displayLogEntry(entry);
-                
-                // Also console log for debugging
-                console.log(`[${timestamp}] ${action}${botNumber ? ` (Bot ${botNumber})` : ''}:`, data);
-            } catch (e) {
-                console.error('Logging failed:', e);
-            }
-        }
-        
-        // Display a single log entry (like how analysis results work)
-        function displayLogEntry(entry) {
-            try {
-                const logContent = dom.logContent;
-                const emptyMessage = document.getElementById('emptyLogMessage');
-                
-                if (emptyMessage) {
-                    emptyMessage.style.display = 'none';
-                }
-                
-                const logElement = document.createElement('div');
-                const botColor = entry.bot === 1 ? 'border-blue-400 text-blue-400' : 
-                                entry.bot === 2 ? 'border-green-400 text-green-400' : 
-                                'border-gray-400 text-gray-400';
-                
-                const botName = entry.bot ? `Bot ${entry.bot}` : 'System';
-                const isError = entry.action.toLowerCase().includes('error') || 
-                               (entry.data.error) || 
-                               (entry.data.status === 'error');
-                
-                const bgColor = isError ? 'bg-red-900/20 border-red-500' : 'bg-gray-700';
-                
-                logElement.className = `${bgColor} rounded-lg p-4 mb-3 border-l-4 ${botColor}`;
-                
-                let content = `
-                    <div class="flex justify-between items-center mb-2">
-                        <h4 class="font-semibold ${entry.bot ? botColor.split(' ')[1] : 'text-gray-300'}">${entry.action} ${entry.bot ? `(${botName})` : ''}</h4>
-                        <span class="text-xs text-gray-500">${entry.timestamp}</span>
-                    </div>
-                    <div class="text-sm text-gray-300 space-y-2">
-                `;
-                
-                // Display all data fields
-                Object.entries(entry.data).forEach(([key, value]) => {
-                    if (value !== undefined && value !== null) {
-                        let displayValue = value;
-                        if (typeof value === 'object') {
-                            displayValue = JSON.stringify(value, null, 2);
-                        }
-                        content += `<div><span class="text-gray-400">${key}:</span> <span class="font-mono text-xs">${displayValue}</span></div>`;
-                    }
-                });
-                
-                content += `</div>`;
-                logElement.innerHTML = content;
-                
-                // Add to top of log (most recent first)
-                logContent.insertBefore(logElement, logContent.firstChild);
-                
-                // Keep only last 50 entries in DOM to prevent lag
-                const entries = logContent.querySelectorAll('div[class*="bg-gray-700"], div[class*="bg-red-900"]');
-                if (entries.length > 50) {
-                    entries[entries.length - 1].remove();
-                }
-                
-            } catch (e) {
-                console.error('Failed to display log entry:', e);
-            }
-        }
-        
-        function clearLog() {
-            logEntries = [];
-            // Clear DOM
-            const logContent = dom.logContent;
-            const entries = logContent.querySelectorAll('div[class*="bg-gray-700"], div[class*="bg-red-900"]');
-            entries.forEach(entry => entry.remove());
-            
-            // Show empty message
-            const emptyMessage = document.getElementById('emptyLogMessage');
-            if (emptyMessage) {
-                emptyMessage.style.display = 'block';
-            }
-            
-            showAlert('Interaction log cleared.');
-        }
-        
-        function toggleLog() {
-            const logSection = dom.logSection;
-            const logArrow = dom.logArrow;
-            
-            if (logSection.classList.contains('hidden')) {
-                logSection.classList.remove('hidden');
-                logArrow.textContent = '▲';
-            } else {
-                logSection.classList.add('hidden');
-                logArrow.textContent = '▼';
-            }
-        }
 
         // DOM elements - Dual bot system
         const dom = {
@@ -713,11 +601,6 @@
             analysisResults: document.getElementById('analysisResults'),
             
             // Log section elements
-            logToggleBtn: document.getElementById('logToggleBtn'),
-            logArrow: document.getElementById('logArrow'),
-            logSection: document.getElementById('logSection'),
-            logContent: document.getElementById('logContent'),
-            clearLogBtn: document.getElementById('clearLogBtn'),
             
             // Status elements for prompt sections
             promptStatus1: document.getElementById('promptStatus1'),
@@ -1080,11 +963,12 @@
             toast.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 max-w-sm';
             toast.textContent = message;
             document.body.appendChild(toast);
-            
+
             setTimeout(() => {
                 toast.remove();
             }, 4000);
         }
+        window.showAlert = showAlert;
 
         // Global function for feeding images to reference (called from HTML)
         window.feedImageToReference = feedImageToReference;
@@ -2862,8 +2746,6 @@ IMPROVED_PROMPT: [A refined version of the original prompt that addresses the id
         });
         
         // Log functionality event listeners
-        dom.logToggleBtn.addEventListener('click', toggleLog);
-        dom.clearLogBtn.addEventListener('click', clearLog);
         
         // Collapse button event listeners
         dom.collapseBtn1.addEventListener('click', () => toggleResponseCollapse(1));
