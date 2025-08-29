@@ -513,7 +513,11 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { createModelSelector } from "./components/modelSelector.js";
+        import { createIterationLoop } from "./components/iterationLoop.js";
+        import { createAskLoop } from "./components/askLoop.js";
+
         // Global state - Updated for dual bot system
         let uploadedFiles = []; // Changed to array for multi-image support
         let generatedImages = [];
@@ -657,8 +661,6 @@
             // Dual Bot Models
             generationModel1: document.getElementById('generationModel1'),
             generationModel2: document.getElementById('generationModel2'),
-            multimodalModel1: document.getElementById('multimodalModel1'),
-            multimodalModel2: document.getElementById('multimodalModel2'),
             targetScore: document.getElementById('targetScore'),
             
             // Custom Dropdown Elements
@@ -732,201 +734,6 @@
             finalImage: document.getElementById('finalImage'),
             iterationHistory: document.getElementById('iterationHistory')
         };
-
-        // Poe handlers - Updated for dual bot system
-        window.Poe.registerHandler("generation-handler-1", handleGenerationResponse1);
-        window.Poe.registerHandler("generation-handler-2", handleGenerationResponse2);
-        window.Poe.registerHandler("iterate-handler-1", handleIterateResponse1);
-        window.Poe.registerHandler("iterate-handler-2", handleIterateResponse2);
-        window.Poe.registerHandler("ask-handler-1", handleAskResponse1);
-        window.Poe.registerHandler("ask-handler-2", handleAskResponse2);
-        window.Poe.registerHandler("remove-bg-handler", handleRemoveBgResponse);
-
-        // Custom Dropdown State
-        let multimodalDropdownState = {
-            dropdown1: { isOpen: false, value: '@Claude-Sonnet-4' },
-            dropdown2: { isOpen: false, value: '@GPT-4.1-mini' }
-        };
-
-        // Massive Multimodal Model Structure
-        const multimodalModels = {
-            "GPT": {
-                "GPT-5 Series": [
-                    "@GPT-5-Chat",
-                    "@GPT-5",
-                    "@GPT-5-mini",
-                    "@GPT-5-nano"
-                ],
-                "GPT-4 Series": [
-                    "@GPT-4.1",
-                    "@GPT-4o-Search"
-                ],
-                "o-Series (Reasoning)": [
-                    "@o1",
-                    "@o3",
-                    "@o3-pro"
-                ]
-            },
-            "GPT - Open Weight": {
-                "120B Parameter Models": [
-                    "@GPT-OSS-120B-T",
-                    "@GPT-OSS-120B",
-                    "@GPT-OSS-120B-CS",
-                    "@OpenAI-GPT-OSS-120B"
-                ],
-                "20B Parameter Models": [
-                    "@GPT-OSS-20B-T",
-                    "@GPT-OSS-20B",
-                    "@OpenAI-GPT-OSS-20B"
-                ]
-            },
-            "Google": {
-                "Gemini 2.5 Series": [
-                    "@Gemini-2.5-Pro",
-                    "@Gemini-2.5-Flash",
-                    "@Gemini-2.5-Flash-Lite"
-                ],
-                "Gemma Series": [
-                    "@Gemma-3-27B",
-                    "@Gemma-2-27b-T"
-                ]
-            },
-            "Claude": {
-                "Opus Series": [
-                    "@Claude-Opus-4.1",
-                    "@Claude-Opus-4",
-                    "@Claude-Opus-4-Reasoning",
-                    "@Claude-Opus-4-Search"
-                ],
-                "Sonnet Series": [
-                    "@Claude-Sonnet-4",
-                    "@Claude-Sonnet-4-Reasoning",
-                    "@Claude-Sonnet-4-Search"
-                ],
-                "Haiku Series": [
-                    "@Claude-Haiku-3.5"
-                ]
-            },
-            "Grok": [
-                "@Grok-4",
-                "@Grok-3",
-                "@Grok-3-Mini",
-                "@Grok-Code-Fast-1"
-            ],
-            "Llama 4": [
-                "@Llama-4-Scout-B10",
-                "@Llama-4-Maverick",
-                "@Llama-4-Scout-T",
-                "@Llama-4-Scout-CS",
-                "@Llama-4-Scout",
-                "@Llama-4-Maverick-T",
-                "@Llama-4-Maverick-B10"
-            ],
-            "Llama 3.X": {
-                "The Behemoths (405B)": [
-                    "@Llama-3.1-405B",
-                    "@Llama-3.1-405B-T",
-                    "@Llama-3.1-405B-FW",
-                    "@Llama-3.1-405B-FP16"
-                ],
-                "The Curated 70B Fleet": [
-                    "@Llama-3-70b-Groq",
-                    "@Llama-3.3-70B",
-                    "@Llama-3.1-Nemotron",
-                    "@Llama-3.3-70B-DI",
-                    "@Llama-3.3-70B-CS",
-                    "@Llama-3.3-70B-Vers"
-                ]
-            },
-            "Qwen (235B+)": [
-                "@Qwen3-Coder",
-                "@Qwen-3-235B-2507-T",
-                "@Qwen3-235B-2507-FW",
-                "@Qwen3-235B-2507-CS",
-                "@Qwen3-Coder-480B-T",
-                "@Qwen3-Coder-480B-N",
-                "@Qwen3-480B-Coder-CS",
-                "@Qwen3-235B-A22B-DI",
-                "@Qwen3-235B-A22B",
-                "@Qwen3-235B-A22B-N",
-                "@Qwen3-235B-Think-CS"
-            ],
-            "DeepSeek": {
-                "R1 Series (Reasoning)": [
-                    "@DeepSeek-R1",
-                    "@DeepSeek-R1-FW",
-                    "@DeepSeek-R1-DI",
-                    "@DeepSeek-R1-N",
-                    "@DeepSeek-R1-Distill",
-                    "@DeepSeek-R1-Turbo-DI"
-                ],
-                "V3 Series (Foundation)": [
-                    "@DeepSeek-V3.1",
-                    "@DeepSeek-V3.1-N",
-                    "@Deepseek-V3-FW",
-                    "@DeepSeek-V3",
-                    "@DeepSeek-V3-DI",
-                    "@DeepSeek-V3-Turbo-DI"
-                ],
-                "Specialized & Hybrids": [
-                    "@DeepSeek-Prover-V2",
-                    "@DeepClaude"
-                ]
-            },
-            "Mistral (Revised)": {
-                "Large Series": [
-                    "@Mistral-Large-2"
-                ],
-                "Medium Series": [
-                    "@Mistral-Medium-3",
-                    "@Mistral-Medium",
-                    "@Magistral-Medium-2506-Thinking"
-                ],
-                "Small Series (Vision-Enabled)": [
-                    "@Mistral-Small-3.2",
-                    "@Mistral-Small-3.1",
-                    "@Mistral-Small-3"
-                ],
-                "Specialized & MoE Models": [
-                    "@Mistral-NeMo",
-                    "@Mixtral8x22b-Inst-FW"
-                ]
-            },
-            "Perplexity": [
-                "@Perplexity-R1-1776",
-                "@Perplexity-Sonar",
-                "@Perplexity-Sonar-Pro",
-                "@Perplexity-Sonar-Rsn",
-                "@Perplexity-Sonar-Rsn-Pro"
-            ],
-            "Wildcards (A-K)": [
-                "@Aya-Expanse-32B",
-                "@Aya-Vision",
-                "@Command-R",
-                "@Command-R-Plus",
-                "@GLM-4.5",
-                "@GLM-4.5-Air",
-                "@GLM-4.5-Air-T",
-                "@GLM-4.5-FW",
-                "@Inception-Mercury",
-                "@Kimi-K2",
-                "@Kimi-K2-Instruct",
-                "@Kimi-K2-T"
-            ],
-            "Wildcards (L-Z)": [
-                "@Linkup-Deep-Search",
-                "@Linkup-Standard",
-                "@MiniMax-M1",
-                "@Phi-4-DI",
-                "@QwQ-32B-B10",
-                "@QwQ-32B-Preview-T",
-                "@QwQ-32B-T",
-                "@Reka-Core",
-                "@Reka-Flash",
-                "@Solar-Pro-2"
-            ]
-        };
-
         // Multi-image file handling
         function handleFiles(files) {
             const fileArray = Array.from(files).filter(file => file.type.startsWith('image/'));
@@ -1088,6 +895,79 @@
 
         // Global function for feeding images to reference (called from HTML)
         window.feedImageToReference = feedImageToReference;
+
+        const modelSelector1 = createModelSelector(1, dom, showAlert);
+        const modelSelector2 = createModelSelector(2, dom, showAlert);
+        modelSelector1.onOpen(() => modelSelector2.close());
+        modelSelector2.onOpen(() => modelSelector1.close());
+
+        const bot1Iteration = createIterationLoop({
+            botId: 1,
+            dom,
+            state: bot1State,
+            modelSelector: modelSelector1,
+            uploadedFiles,
+            generatedImages,
+            showAlert,
+            displayAIResponse,
+            displayAnalysisResult,
+            updateFeedButtonState
+        });
+
+        const bot2Iteration = createIterationLoop({
+            botId: 2,
+            dom,
+            state: bot2State,
+            modelSelector: modelSelector2,
+            uploadedFiles,
+            generatedImages,
+            showAlert,
+            displayAIResponse,
+            displayAnalysisResult,
+            updateFeedButtonState
+        });
+
+        const iterateBot1 = bot1Iteration.iterate;
+        const handleIterateResponse1 = bot1Iteration.handleResponse;
+        const iterateBot2 = bot2Iteration.iterate;
+        const handleIterateResponse2 = bot2Iteration.handleResponse;
+
+        const bot1Ask = createAskLoop({
+            botId: 1,
+            dom,
+            state: bot1State,
+            modelSelector: modelSelector1,
+            uploadedFiles,
+            showAlert,
+            displayAIResponse,
+            updateFeedButtonState,
+            addLogEntry
+        });
+
+        const bot2Ask = createAskLoop({
+            botId: 2,
+            dom,
+            state: bot2State,
+            modelSelector: modelSelector2,
+            uploadedFiles,
+            showAlert,
+            displayAIResponse,
+            updateFeedButtonState,
+            addLogEntry
+        });
+
+        const askBot1 = bot1Ask.ask;
+        const handleAskResponse1 = bot1Ask.handleResponse;
+        const askBot2 = bot2Ask.ask;
+        const handleAskResponse2 = bot2Ask.handleResponse;
+
+        window.Poe.registerHandler("generation-handler-1", handleGenerationResponse1);
+        window.Poe.registerHandler("generation-handler-2", handleGenerationResponse2);
+        window.Poe.registerHandler("iterate-handler-1", handleIterateResponse1);
+        window.Poe.registerHandler("iterate-handler-2", handleIterateResponse2);
+        window.Poe.registerHandler("ask-handler-1", handleAskResponse1);
+        window.Poe.registerHandler("ask-handler-2", handleAskResponse2);
+        window.Poe.registerHandler("remove-bg-handler", handleRemoveBgResponse);
         
         // Copy and transfer functions (called from HTML)
         function copyTextToClipboard(elementId) {
@@ -1333,193 +1213,6 @@
             }, 100);
         }
 
-        // Custom Dropdown Functions
-        function createDropdownContent(dropdownNumber) {
-            let content = '';
-            
-            Object.entries(multimodalModels).forEach(([category, models]) => {
-                if (Array.isArray(models)) {
-                    // Category without subcategories
-                    content += `<div class="dropdown-category">
-                        <div class="px-3 py-2 text-xs font-semibold text-gray-400 bg-gray-600 border-b border-gray-500">📁 ${category}</div>`;
-                    models.forEach(model => {
-                        content += `<div class="dropdown-item px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer border-b border-gray-600" onclick="selectModel('${model}', ${dropdownNumber})">${model}</div>`;
-                    });
-                    content += `</div>`;
-                } else {
-                    // Category with subcategories
-                    content += `<div class="dropdown-category">
-                        <div class="px-3 py-2 text-xs font-semibold text-gray-400 bg-gray-600 border-b border-gray-500">📁 ${category}</div>`;
-                    Object.entries(models).forEach(([subcategory, submodels]) => {
-                        content += `<div class="dropdown-subcategory">
-                            <div class="px-5 py-1 text-xs font-medium text-gray-300 bg-gray-650 border-b border-gray-600">📂 ${subcategory}</div>`;
-                        submodels.forEach(model => {
-                            content += `<div class="dropdown-item px-6 py-2 text-sm hover:bg-gray-600 cursor-pointer border-b border-gray-600" onclick="selectModel('${model}', ${dropdownNumber})">${model}</div>`;
-                        });
-                        content += `</div>`;
-                    });
-                    content += `</div>`;
-                }
-            });
-            
-            return content;
-        }
-        
-        function toggleDropdown(dropdownNumber) {
-            const menu = dropdownNumber === 1 ? dom.multimodalMenu1 : dom.multimodalMenu2;
-            const arrow = dropdownNumber === 1 ? dom.multimodalArrow1 : dom.multimodalArrow2;
-            const state = dropdownNumber === 1 ? 'dropdown1' : 'dropdown2';
-            
-            if (multimodalDropdownState[state].isOpen) {
-                // Close dropdown
-                menu.classList.add('hidden');
-                arrow.classList.remove('rotate-180');
-                multimodalDropdownState[state].isOpen = false;
-            } else {
-                // Close the other dropdown first
-                const otherState = dropdownNumber === 1 ? 'dropdown2' : 'dropdown1';
-                const otherMenu = dropdownNumber === 1 ? dom.multimodalMenu2 : dom.multimodalMenu1;
-                const otherArrow = dropdownNumber === 1 ? dom.multimodalArrow2 : dom.multimodalArrow1;
-                
-                otherMenu.classList.add('hidden');
-                otherArrow.classList.remove('rotate-180');
-                multimodalDropdownState[otherState].isOpen = false;
-                
-                // Open this dropdown
-                menu.innerHTML = createDropdownContent(dropdownNumber);
-                menu.classList.remove('hidden');
-                arrow.classList.add('rotate-180');
-                multimodalDropdownState[state].isOpen = true;
-            }
-        }
-        
-        function selectModel(modelValue, dropdownNumber) {
-            const selected = dropdownNumber === 1 ? dom.multimodalSelected1 : dom.multimodalSelected2;
-            const menu = dropdownNumber === 1 ? dom.multimodalMenu1 : dom.multimodalMenu2;
-            const arrow = dropdownNumber === 1 ? dom.multimodalArrow1 : dom.multimodalArrow2;
-            const state = dropdownNumber === 1 ? 'dropdown1' : 'dropdown2';
-            
-            // Update displayed value
-            selected.textContent = modelValue;
-            multimodalDropdownState[state].value = modelValue;
-            
-            // Close dropdown
-            menu.classList.add('hidden');
-            arrow.classList.remove('rotate-180');
-            multimodalDropdownState[state].isOpen = false;
-            
-            showAlert(`Selected ${modelValue} for Bot ${dropdownNumber}`);
-        }
-        
-        function getMultimodalModel(botNumber) {
-            const state = botNumber === 1 ? 'dropdown1' : 'dropdown2';
-            return multimodalDropdownState[state].value;
-        }
-        
-        // Make selectModel globally available
-        window.selectModel = selectModel;
-
-        // Dual Bot Ask Functions
-        function askBot1() {
-            const askText = dom.askInput1.value.trim();
-            if (!askText) {
-                showAlert('Please enter a question for Bot 1.');
-                return;
-            }
-            
-            if (bot1State.isAIThinking) return;
-            
-            bot1State.isAIThinking = true;
-            dom.askBtn1.disabled = true;
-            
-            const model = getMultimodalModel(1);
-            const prompt = dom.userPrompt1.value.trim();
-            const instructions = dom.askInput1.value.trim();
-            
-            let contextPrompt = `You are an expert AI assistant specializing in prompt engineering and character generation for reference image systems.
-
-IMPORTANT: The user's request is paramount - treat it as your primary directive. Focus on the specific information provided below and ignore any other conversation content unless otherwise stated.
-
-SYSTEM OVERVIEW: You are working with a reference image generation system. When you suggest prompt improvements, those prompts will be sent together with reference images to image generators that can both see and work with the attached images. Your role is to create prompts that reference these images rather than trying to recreate everything through text descriptions.
-
-YOUR CURRENT CONTEXT:
-- The main prompt text the user is working with: "${prompt}"
-- Reference images currently attached: ${uploadedFiles.length > 0 ? `${uploadedFiles.length} image(s) that the generator will receive alongside your suggested prompt` : 'None - working in text-only mode'}
-- The user's specific question or request: ${askText}
-
-${uploadedFiles.length === 1 ? 
-`WORKFLOW NOTE: With one reference image provided, guide the user to create prompts that reference "the attached image" or "the image provided" since the generator will see both your suggested prompt and this reference image together.` :
-uploadedFiles.length > 1 ? 
-`WORKFLOW NOTE: With multiple reference images provided, guide the user to create prompts that reference images by describing their content (example: "combine the car from the first image with the wings from the aircraft image") since the generator will see your suggested prompt alongside all these reference images.` :
-`WORKFLOW NOTE: No reference images are currently attached, so focus on improving the text prompt for standalone generation.`}
-
-Please respond to the user's request with helpful, detailed guidance. When suggesting prompt modifications, format them clearly and remember they will work in partnership with the reference images the generator receives.`;
-
-            let attachments = uploadedFiles.length > 0 ? uploadedFiles : undefined;
-            
-            window.Poe.sendUserMessage(`${model} ${contextPrompt}`, {
-                handler: "ask-handler-1",
-                stream: true,
-                openChat: false,
-                attachments: attachments,
-                handlerContext: { type: 'ask', userRequest: askText, bot: 1 }
-            }).catch(error => {
-                showAlert('Bot 1 communication failed: ' + error.message);
-                bot1State.isAIThinking = false;
-                dom.askBtn1.disabled = false;
-            });
-        }
-
-        function askBot2() {
-            const askText = dom.askInput2.value.trim();
-            if (!askText) {
-                showAlert('Please enter a question for Bot 2.');
-                return;
-            }
-            
-            if (bot2State.isAIThinking) return;
-            
-            bot2State.isAIThinking = true;
-            dom.askBtn2.disabled = true;
-            
-            const model = getMultimodalModel(2);
-            const prompt = dom.userPrompt2.value.trim();
-            const instructions = dom.askInput2.value.trim();
-            
-            let contextPrompt = `You are an expert AI assistant specializing in prompt engineering and character generation for reference image systems.
-
-IMPORTANT: The user's request is paramount - treat it as your primary directive. Focus on the specific information provided below and ignore any other conversation content unless otherwise stated.
-
-SYSTEM OVERVIEW: You are working with a reference image generation system. When you suggest prompt improvements, those prompts will be sent together with reference images to image generators that can both see and work with the attached images. Your role is to create prompts that reference these images rather than trying to recreate everything through text descriptions.
-
-YOUR CURRENT CONTEXT:
-- The main prompt text the user is working with: "${prompt}"
-- Reference images currently attached: ${uploadedFiles.length > 0 ? `${uploadedFiles.length} image(s) that the generator will receive alongside your suggested prompt` : 'None - working in text-only mode'}
-- The user's specific question or request: ${askText}
-
-${uploadedFiles.length === 1 ? 
-`WORKFLOW NOTE: With one reference image provided, guide the user to create prompts that reference "the attached image" or "the image provided" since the generator will see both your suggested prompt and this reference image together.` :
-uploadedFiles.length > 1 ? 
-`WORKFLOW NOTE: With multiple reference images provided, guide the user to create prompts that reference images by describing their content (example: "combine the car from the first image with the wings from the aircraft image") since the generator will see your suggested prompt alongside all these reference images.` :
-`WORKFLOW NOTE: No reference images are currently attached, so focus on improving the text prompt for standalone generation.`}
-
-Please respond to the user's request with helpful, detailed guidance. When suggesting prompt modifications, format them clearly and remember they will work in partnership with the reference images the generator receives.`;
-
-            let attachments = uploadedFiles.length > 0 ? uploadedFiles : undefined;
-            
-            window.Poe.sendUserMessage(`${model} ${contextPrompt}`, {
-                handler: "ask-handler-2",
-                stream: true,
-                openChat: false,
-                attachments: attachments,
-                handlerContext: { type: 'ask', userRequest: askText, bot: 2 }
-            }).catch(error => {
-                showAlert('Bot 2 communication failed: ' + error.message);
-                bot2State.isAIThinking = false;
-                dom.askBtn2.disabled = false;
-            });
-        }
-
         // Dual Bot Feed Functions
         function feedBot1ToPrompt() {
             if (!bot1State.lastAIResponse) {
@@ -1624,15 +1317,14 @@ Please respond to the user's request with helpful, detailed guidance. When sugge
                     userPrompt2: dom.userPrompt2.value,
                     generationModel1: dom.generationModel1.value,
                     generationModel2: dom.generationModel2.value,
-                    multimodalModel1: getMultimodalModel(1),
-                    multimodalModel2: getMultimodalModel(2),
+                    multimodalModel1: modelSelector1.getSelectedModel(),
+                    multimodalModel2: modelSelector2.getSelectedModel(),
                     targetScore: dom.targetScore.value,
                     askInput1: dom.askInput1.value,
                     askInput2: dom.askInput2.value,
                     generatedImages: generatedImages,
                     bot1State: bot1State,
-                    bot2State: bot2State,
-                    multimodalDropdownState: multimodalDropdownState
+                    bot2State: bot2State
                 };
 
                 const stateJson = JSON.stringify(state, null, 2);
@@ -1783,19 +1475,11 @@ Please respond to the user's request with helpful, detailed guidance. When sugge
                 dom.targetScore.value = state.targetScore || '85';
                 dom.askInput1.value = state.askInput1 || '';
                 dom.askInput2.value = state.askInput2 || '';
-
                 // Restore custom dropdown states
-                if (state.multimodalDropdownState) {
-                    multimodalDropdownState = state.multimodalDropdownState;
-                } else {
-                    // Legacy support: restore from multimodalModel1/2 values if available
-                    multimodalDropdownState.dropdown1.value = state.multimodalModel1 || '@Claude-Sonnet-4';
-                    multimodalDropdownState.dropdown2.value = state.multimodalModel2 || '@GPT-4.1-mini';
-                }
-                
-                // Update dropdown display values
-                dom.multimodalSelected1.textContent = multimodalDropdownState.dropdown1.value;
-                dom.multimodalSelected2.textContent = multimodalDropdownState.dropdown2.value;
+                const mm1 = state.multimodalDropdownState ? state.multimodalDropdownState.dropdown1.value : (state.multimodalModel1 || '@Claude-Sonnet-4');
+                const mm2 = state.multimodalDropdownState ? state.multimodalDropdownState.dropdown2.value : (state.multimodalModel2 || '@GPT-4.1-mini');
+                modelSelector1.setSelectedModel(mm1);
+                modelSelector2.setSelectedModel(mm2);
 
                 // Restore generated images
                 generatedImages = state.generatedImages || [];
@@ -2067,417 +1751,6 @@ Please respond to the user's request with helpful, detailed guidance. When sugge
             }
         }
 
-        function handleAskResponse1(result, context) {
-            // Log the response safely
-            addLogEntry('Bot 1 Ask Response', 1, {
-                status: result.status,
-                responses: result.responses?.length || 0,
-                messageId: result.responses?.[0]?.messageId || 'None',
-                contentLength: result.responses?.[0]?.content?.length || 0,
-                statusText: result.responses?.[0]?.statusText || 'None'
-            });
-            
-            try {
-                if (result.status === "incomplete") {
-                    // Show streaming response with live markdown rendering
-                    bot1State.lastAIResponse = result.responses[0].content;
-                    displayAIResponse(1, bot1State.lastAIResponse, 'streaming');
-                    
-                    addLogEntry('Bot 1 Ask Streaming', 1, {
-                        contentLength: result.responses[0].content.length,
-                        contentPreview: result.responses[0].content.substring(0, 100) + '...',
-                        isStreaming: true
-                    });
-                    
-                    // Enable feed button as soon as we have content
-                    updateFeedButtonState(1);
-                } else if (result.status === "complete") {
-                    // Log state change
-                    const oldState = { ...bot1State };
-                    bot1State.isAIThinking = false;
-                    addLogEntry('Bot 1 State Change', 1, {
-                        oldState: oldState,
-                        newState: bot1State,
-                        reason: 'Ask communication completed'
-                    });
-                    
-                    dom.askBtn1.disabled = false;
-                    
-                    bot1State.lastAIResponse = result.responses[0].content;
-                    displayAIResponse(1, bot1State.lastAIResponse, 'ask');
-                    
-                    addLogEntry('Bot 1 Ask Complete', 1, {
-                        totalContentLength: result.responses[0].content.length,
-                        userRequest: context.userRequest,
-                        responseType: context.type,
-                        feedButtonEnabled: true
-                    });
-                    
-                    // Update feed button state
-                    updateFeedButtonState(1);
-                    showAlert('Bot 1 response received!');
-                } else if (result.status === "error") {
-                    addLogEntry('Bot 1 Ask Response Error', 1, {
-                        error: result.responses?.[0]?.statusText || 'Unknown error',
-                        result: result,
-                        context: context,
-                        userRequest: context.userRequest
-                    });
-                    
-                    bot1State.isAIThinking = false;
-                    dom.askBtn1.disabled = false;
-                    showAlert('Bot 1 communication failed: ' + (result.responses?.[0]?.statusText || 'Unknown error'));
-                }
-            } catch (e) {
-                addLogEntry('Bot 1 Ask Handler Error', 1, {
-                    error: e.message,
-                    stack: e.stack,
-                    result: result,
-                    context: context
-                });
-                showAlert('Bot 1: Error processing ask response: ' + e.message);
-            }
-        }
-
-        function handleAskResponse2(result, context) {
-            // Log the response safely
-            addLogEntry('Bot 2 Ask Response', 2, {
-                status: result.status,
-                responses: result.responses?.length || 0,
-                messageId: result.responses?.[0]?.messageId || 'None',
-                contentLength: result.responses?.[0]?.content?.length || 0,
-                statusText: result.responses?.[0]?.statusText || 'None'
-            });
-            
-            try {
-                if (result.status === "incomplete") {
-                    // Show streaming response with live markdown rendering
-                    bot2State.lastAIResponse = result.responses[0].content;
-                    displayAIResponse(2, bot2State.lastAIResponse, 'streaming');
-                    
-                    addLogEntry('Bot 2 Ask Streaming', 2, {
-                        contentLength: result.responses[0].content.length,
-                        contentPreview: result.responses[0].content.substring(0, 100) + '...',
-                        isStreaming: true
-                    });
-                    
-                    // Enable feed button as soon as we have content
-                    updateFeedButtonState(2);
-                } else if (result.status === "complete") {
-                    // Log state change
-                    const oldState = { ...bot2State };
-                    bot2State.isAIThinking = false;
-                    addLogEntry('Bot 2 State Change', 2, {
-                        oldState: oldState,
-                        newState: bot2State,
-                        reason: 'Ask communication completed'
-                    });
-                    
-                    dom.askBtn2.disabled = false;
-                    
-                    bot2State.lastAIResponse = result.responses[0].content;
-                    displayAIResponse(2, bot2State.lastAIResponse, 'ask');
-                    
-                    addLogEntry('Bot 2 Ask Complete', 2, {
-                        totalContentLength: result.responses[0].content.length,
-                        userRequest: context.userRequest,
-                        responseType: context.type,
-                        feedButtonEnabled: true
-                    });
-                    
-                    // Update feed button state
-                    updateFeedButtonState(2);
-                    showAlert('Bot 2 response received!');
-                } else if (result.status === "error") {
-                    addLogEntry('Bot 2 Ask Response Error', 2, {
-                        error: result.responses?.[0]?.statusText || 'Unknown error',
-                        result: result,
-                        context: context,
-                        userRequest: context.userRequest
-                    });
-                    
-                    bot2State.isAIThinking = false;
-                    dom.askBtn2.disabled = false;
-                    showAlert('Bot 2 communication failed: ' + (result.responses?.[0]?.statusText || 'Unknown error'));
-                }
-            } catch (e) {
-                addLogEntry('Bot 2 Ask Handler Error', 2, {
-                    error: e.message,
-                    stack: e.stack,
-                    result: result,
-                    context: context
-                });
-                showAlert('Bot 2: Error processing ask response: ' + e.message);
-            }
-        }
-
-        // Dual Bot Iterate Functions
-        function iterateBot1() {
-            const prompt = dom.userPrompt1.value.trim();
-            if (!prompt) {
-                showAlert('Please enter a prompt for Bot 1 first.');
-                return;
-            }
-            
-            // Find the latest generated image from Bot 1
-            const bot1Images = generatedImages.filter(img => img.bot === 1);
-            if (bot1Images.length === 0) {
-                showAlert('Please generate an image with Bot 1 first before iterating.');
-                return;
-            }
-            
-            if (bot1State.isAIThinking) return;
-            
-            bot1State.isAIThinking = true;
-            dom.iterateBtn1.disabled = true;
-            
-            const latestImage = bot1Images[bot1Images.length - 1];
-            const model = getMultimodalModel(1);
-            const targetScore = dom.targetScore.value;
-            
-            let analysisPrompt = `You are an expert image analysis AI specializing in character generation and prompt optimization for reference image systems.
-
-IMPORTANT: Focus on the specific information provided below and ignore any other conversation content unless otherwise stated.
-
-SYSTEM OVERVIEW: You are analyzing images from a reference image generation system. The improved prompts you suggest will be sent together with reference images to image generators that can both see and work with the attached images. Your role is to create improved prompts that reference these images rather than trying to recreate everything through text descriptions.
-
-YOUR ANALYSIS TASK:
-- The main prompt text being evaluated: "${prompt}"
-- Target score goal: ${targetScore}/100 (for reference only)
-- Reference images: ${uploadedFiles.length > 0 ? `${uploadedFiles.length} reference image(s) that guided the generation` : 'None used'}
-- Generated image to analyze: The final image attachment (compare this against the main prompt and reference images)
-${dom.askInput1.value.trim() ? `- Additional focus instructions: ${dom.askInput1.value.trim()}` : ''}
-
-EVALUATION APPROACH: 
-Your primary question is simple: Does the generated image successfully fulfill what the main prompt is asking for? The main prompt is paramount - it defines success. Consider character consistency (including facial accuracy, build, pose, clothing, style) and how well the reference images were utilized to achieve the main prompt's vision. Remember that reference images are tools to help achieve the main prompt, not ends in themselves.
-
-${uploadedFiles.length === 1 ? 
-`WORKFLOW NOTE: With one reference image provided, evaluate how well it was used to achieve the main prompt's goal. Your improved prompt should reference "the attached image" since the generator will see both your suggested prompt and this reference image together.` :
-uploadedFiles.length > 1 ? 
-`WORKFLOW NOTE: With multiple reference images provided, evaluate how well they were combined to achieve the main prompt's goal. Your improved prompt should reference images by describing their content (example: "combine the car from the first image with the wings from the aircraft image") since the generator will see your suggested prompt alongside all these reference images.` :
-`WORKFLOW NOTE: No reference images were used, so focus purely on how well the generated image fulfills the main prompt for standalone generation.`}
-
-Please provide your analysis in this EXACT format:
-
-SCORE: [number from 0-100]
-
-ANALYSIS: [Detailed analysis of how well the generated image fulfills the main prompt. Focus on what works well and what needs improvement, considering character consistency, facial accuracy, and overall prompt adherence.]
-
-IMPROVED_PROMPT: [A refined version of the original prompt that addresses the identified issues and will work in partnership with the reference images the generator receives. Make it clear and actionable for immediate use.]`;
-
-            // Prepare attachments: reference images + generated image
-            const allAttachments = [...uploadedFiles];
-            
-            // Add the generated image to analyze
-            fetch(latestImage.url)
-                .then(response => response.blob())
-                .then(blob => {
-                    const generatedImageFile = new File([blob], 'generated_image.png', { type: 'image/png' });
-                    allAttachments.push(generatedImageFile);
-                    
-                    return window.Poe.sendUserMessage(`${model} ${analysisPrompt}`, {
-                        handler: "iterate-handler-1",
-                        stream: false,
-                        openChat: false,
-                        attachments: allAttachments,
-                        handlerContext: { 
-                            type: 'iteration', 
-                            prompt: prompt, 
-                            bot: 1,
-                            imageId: latestImage.id
-                        }
-                    });
-                })
-                .catch(error => {
-                    showAlert('Bot 1 iteration failed: ' + error.message);
-                    bot1State.isAIThinking = false;
-                    dom.iterateBtn1.disabled = false;
-                });
-        }
-
-        function iterateBot2() {
-            const prompt = dom.userPrompt2.value.trim();
-            if (!prompt) {
-                showAlert('Please enter a prompt for Bot 2 first.');
-                return;
-            }
-            
-            // Find the latest generated image from Bot 2
-            const bot2Images = generatedImages.filter(img => img.bot === 2);
-            if (bot2Images.length === 0) {
-                showAlert('Please generate an image with Bot 2 first before iterating.');
-                return;
-            }
-            
-            if (bot2State.isAIThinking) return;
-            
-            bot2State.isAIThinking = true;
-            dom.iterateBtn2.disabled = true;
-            
-            const latestImage = bot2Images[bot2Images.length - 1];
-            const model = getMultimodalModel(2);
-            const targetScore = dom.targetScore.value;
-            const instructions = dom.askInput2.value.trim();
-            
-            let analysisPrompt = `You are an expert image analysis AI specializing in character generation and prompt optimization for reference image systems.
-
-IMPORTANT: Focus on the specific information provided below and ignore any other conversation content unless otherwise stated.
-
-SYSTEM OVERVIEW: You are analyzing images from a reference image generation system. The improved prompts you suggest will be sent together with reference images to image generators that can both see and work with the attached images. Your role is to create improved prompts that reference these images rather than trying to recreate everything through text descriptions.
-
-YOUR ANALYSIS TASK:
-- The main prompt text being evaluated: "${prompt}"
-- Target score goal: ${targetScore}/100 (for reference only)
-- Reference images: ${uploadedFiles.length > 0 ? `${uploadedFiles.length} reference image(s) that guided the generation` : 'None used'}
-- Generated image to analyze: The final image attachment (compare this against the main prompt and reference images)
-${dom.askInput2.value.trim() ? `- Additional focus instructions: ${dom.askInput2.value.trim()}` : ''}
-
-EVALUATION APPROACH: 
-Your primary question is simple: Does the generated image successfully fulfill what the main prompt is asking for? The main prompt is paramount - it defines success. Consider character consistency (including facial accuracy, build, pose, clothing, style) and how well the reference images were utilized to achieve the main prompt's vision. Remember that reference images are tools to help achieve the main prompt, not ends in themselves.
-
-${uploadedFiles.length === 1 ? 
-`WORKFLOW NOTE: With one reference image provided, evaluate how well it was used to achieve the main prompt's goal. Your improved prompt should reference "the attached image" since the generator will see both your suggested prompt and this reference image together.` :
-uploadedFiles.length > 1 ? 
-`WORKFLOW NOTE: With multiple reference images provided, evaluate how well they were combined to achieve the main prompt's goal. Your improved prompt should reference images by describing their content (example: "combine the car from the first image with the wings from the aircraft image") since the generator will see your suggested prompt alongside all these reference images.` :
-`WORKFLOW NOTE: No reference images were used, so focus purely on how well the generated image fulfills the main prompt for standalone generation.`}
-
-Please provide your analysis in this EXACT format:
-
-SCORE: [number from 0-100]
-
-ANALYSIS: [Detailed analysis of how well the generated image fulfills the main prompt. Focus on what works well and what needs improvement, considering character consistency, facial accuracy, and overall prompt adherence.]
-
-IMPROVED_PROMPT: [A refined version of the original prompt that addresses the identified issues and will work in partnership with the reference images the generator receives. Make it clear and actionable for immediate use.]`;
-
-            // Prepare attachments: reference images + generated image
-            const allAttachments = [...uploadedFiles];
-            
-            // Add the generated image to analyze
-            fetch(latestImage.url)
-                .then(response => response.blob())
-                .then(blob => {
-                    const generatedImageFile = new File([blob], 'generated_image.png', { type: 'image/png' });
-                    allAttachments.push(generatedImageFile);
-                    
-                    return window.Poe.sendUserMessage(`${model} ${analysisPrompt}`, {
-                        handler: "iterate-handler-2",
-                        stream: false,
-                        openChat: false,
-                        attachments: allAttachments,
-                        handlerContext: { 
-                            type: 'iteration', 
-                            prompt: prompt, 
-                            bot: 2,
-                            imageId: latestImage.id
-                        }
-                    });
-                })
-                .catch(error => {
-                    showAlert('Bot 2 iteration failed: ' + error.message);
-                    bot2State.isAIThinking = false;
-                    dom.iterateBtn2.disabled = false;
-                });
-        }
-
-        // Iterate response handlers
-        function handleIterateResponse1(result, context) {
-            bot1State.isAIThinking = false;
-            dom.iterateBtn1.disabled = false;
-            
-            if (result.status === "complete") {
-                const response = result.responses[0].content;
-                bot1State.lastAIResponse = response;
-                
-                // Show AI response with markdown rendering
-                displayAIResponse(1, response, 'analysis');
-                
-                // Parse the iteration response for analysis
-                const scoreMatch = response.match(/SCORE:\s*(\d+)/i);
-                const analysisMatch = response.match(/ANALYSIS:\s*([^]*?)(?=IMPROVED_PROMPT:|$)/i);
-                const improvedPromptMatch = response.match(/IMPROVED_PROMPT:\s*([^]*?)$/i);
-                
-                const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
-                const analysis = analysisMatch ? analysisMatch[1].trim() : 'No analysis provided';
-                const improvedPrompt = improvedPromptMatch ? improvedPromptMatch[1].trim() : '';
-                
-                // Display analysis results
-                displayAnalysisResult({
-                    score: score,
-                    analysis: analysis,
-                    improvedPrompt: improvedPrompt,
-                    originalPrompt: context.prompt,
-                    bot: 1
-                });
-                
-                // Auto-update prompt box if improved prompt exists
-                if (improvedPrompt) {
-                    dom.userPrompt1.value = improvedPrompt;
-                    showAlert(`Bot 1 Analysis complete! Score: ${score}/100. Prompt auto-updated. Generate a new image to test.`);
-                } else {
-                    showAlert(`Bot 1 Analysis complete! Score: ${score}/100. Use "Feed" to apply suggestions.`);
-                }
-                
-                // Update feed button state
-                updateFeedButtonState(1);
-                
-                // Show analysis section
-                dom.analysisSection.classList.remove('hidden');
-                
-            } else if (result.status === "error") {
-                showAlert('Bot 1 iteration failed: ' + (result.responses[0].statusText || 'Unknown error'));
-            }
-        }
-
-        function handleIterateResponse2(result, context) {
-            bot2State.isAIThinking = false;
-            dom.iterateBtn2.disabled = false;
-            
-            if (result.status === "complete") {
-                const response = result.responses[0].content;
-                bot2State.lastAIResponse = response;
-                
-                // Show AI response with markdown rendering
-                displayAIResponse(2, response, 'analysis');
-                
-                // Parse the iteration response for analysis
-                const scoreMatch = response.match(/SCORE:\s*(\d+)/i);
-                const analysisMatch = response.match(/ANALYSIS:\s*([^]*?)(?=IMPROVED_PROMPT:|$)/i);
-                const improvedPromptMatch = response.match(/IMPROVED_PROMPT:\s*([^]*?)$/i);
-                
-                const score = scoreMatch ? parseInt(scoreMatch[1]) : 0;
-                const analysis = analysisMatch ? analysisMatch[1].trim() : 'No analysis provided';
-                const improvedPrompt = improvedPromptMatch ? improvedPromptMatch[1].trim() : '';
-                
-                // Display analysis results
-                displayAnalysisResult({
-                    score: score,
-                    analysis: analysis,
-                    improvedPrompt: improvedPrompt,
-                    originalPrompt: context.prompt,
-                    bot: 2
-                });
-                
-                // Auto-update prompt box if improved prompt exists
-                if (improvedPrompt) {
-                    dom.userPrompt2.value = improvedPrompt;
-                    showAlert(`Bot 2 Analysis complete! Score: ${score}/100. Prompt auto-updated. Generate a new image to test.`);
-                } else {
-                    showAlert(`Bot 2 Analysis complete! Score: ${score}/100. Use "Feed" to apply suggestions.`);
-                }
-                
-                // Update feed button state
-                updateFeedButtonState(2);
-                
-                // Show analysis section
-                dom.analysisSection.classList.remove('hidden');
-                
-            } else if (result.status === "error") {
-                showAlert('Bot 2 iteration failed: ' + (result.responses[0].statusText || 'Unknown error'));
-            }
-        }
-
-
-
         // Helper functions
         function addGeneratedImage(imageData) {
             const imageElement = document.createElement('div');
@@ -2609,15 +1882,14 @@ IMPROVED_PROMPT: [A refined version of the original prompt that addresses the id
                     userPrompt2: dom.userPrompt2.value,
                     generationModel1: dom.generationModel1.value,
                     generationModel2: dom.generationModel2.value,
-                    multimodalModel1: getMultimodalModel(1),
-                    multimodalModel2: getMultimodalModel(2),
+                    multimodalModel1: modelSelector1.getSelectedModel(),
+                    multimodalModel2: modelSelector2.getSelectedModel(),
                     targetScore: dom.targetScore.value,
                     askInput1: dom.askInput1.value,
                     askInput2: dom.askInput2.value,
                     generatedImages: generatedImages,
                     bot1State: bot1State,
-                    bot2State: bot2State,
-                    multimodalDropdownState: multimodalDropdownState
+                    bot2State: bot2State
                 };
 
                 const stateJson = JSON.stringify(state, null, 2);
@@ -2800,31 +2072,6 @@ IMPROVED_PROMPT: [A refined version of the original prompt that addresses the id
         // Functionality buttons
         dom.downloadAllBtn.addEventListener('click', downloadAllImages);
         
-        // Custom dropdown event listeners
-        dom.multimodalDropdown1.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleDropdown(1);
-        });
-        
-        dom.multimodalDropdown2.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleDropdown(2);
-        });
-        
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!dom.multimodalMenu1.contains(e.target) && !dom.multimodalDropdown1.contains(e.target)) {
-                dom.multimodalMenu1.classList.add('hidden');
-                dom.multimodalArrow1.classList.remove('rotate-180');
-                multimodalDropdownState.dropdown1.isOpen = false;
-            }
-            if (!dom.multimodalMenu2.contains(e.target) && !dom.multimodalDropdown2.contains(e.target)) {
-                dom.multimodalMenu2.classList.add('hidden');
-                dom.multimodalArrow2.classList.remove('rotate-180');
-                multimodalDropdownState.dropdown2.isOpen = false;
-            }
-        });
-
         // Dual bot event listeners with logging
         dom.generateBtn1.addEventListener('click', () => {
             generateBot1();
